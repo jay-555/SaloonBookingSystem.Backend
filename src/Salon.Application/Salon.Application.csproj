@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Salon.Domain/Salon.Domain.csproj" />
+  </ItemGroup>
+</Project>
