@@ -142,6 +142,24 @@ public static class AuthenticationSetup
             catch (KeyNotFoundException) { return Results.NotFound(); }
             catch (InvalidOperationException error) { return Results.Conflict(new { error = error.Message }); }
         }).RequireAuthorization();
+        app.MapPut("/services/{id:guid}/requirements", async (Guid id, ResourceRequirementInput input, HttpContext context, IServiceCatalog services, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await services.SetRequirements(UserId(context), id, input, ct)); }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+            catch (ArgumentOutOfRangeException error) { return ServiceValidation(error); }
+            catch (ArgumentException error) { return ServiceValidation(error); }
+        }).RequireAuthorization();
+        app.MapDelete("/services/{id:guid}/requirements", async (Guid id, HttpContext context, IServiceCatalog services, CancellationToken ct) =>
+        {
+            try
+            {
+                await services.ClearRequirements(UserId(context), id, ct);
+                return Results.NoContent();
+            }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+        }).RequireAuthorization();
         app.MapGet("/employees", async (HttpContext context, IEmployeeDirectory employees, CancellationToken ct) =>
         {
             try { return Results.Ok(await employees.List(UserId(context), ct)); }
@@ -268,6 +286,9 @@ public static class AuthenticationSetup
             "category" => "category",
             "price" => "price",
             "durationMinutes" => "durationMinutes",
+            "seatType" => "seatType",
+            "bufferMinutes" => "bufferMinutes",
+            "employeeCapacity" => "employeeCapacity",
             _ => "name",
         };
         return Results.ValidationProblem(new Dictionary<string, string[]> { [field] = [error.Message] });

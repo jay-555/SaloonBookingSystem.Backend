@@ -202,6 +202,21 @@ employee skills or seat support links still reference the service (HTTP 409).
 REST: `GET/POST /services`, `GET/PUT/DELETE /services/{id}`. Admin UI lives at
 `/admin/services` on the frontend.
 
+## Phase 6: service resource requirements
+
+Apply the additive `ServiceResourceRequirements` migration after Phase 5:
+
+```powershell
+dotnet ef database update --project src/Salon.Infrastructure
+```
+
+OwnerAdmin can set and clear each service's resource requirements: employee
+capacity fixed at 1, required seat type, and optional buffer minutes. Manager
+can read requirements on service detail. REST:
+`PUT/DELETE /services/{id}/requirements` (also returned on
+`GET /services/{id}`). Admin UI is on the service editor under
+`/admin/services/{id}`.
+
 Browser sessions use Identity cookies with an eight-hour absolute lifetime and
 no remember-me or sliding renewal. Cookies are HttpOnly, host-only, SameSite=Lax,
 and Secure outside Development. Development over HTTP is for loopback local use
