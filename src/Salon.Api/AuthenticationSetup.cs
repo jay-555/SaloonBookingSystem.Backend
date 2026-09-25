@@ -53,6 +53,7 @@ public static class AuthenticationSetup
         builder.Services.AddScoped<IServiceCatalog, ServiceCatalog>();
         builder.Services.AddScoped<IAvailabilityService, AvailabilityService>();
         builder.Services.AddScoped<IPublicBooking, PublicBookingService>();
+        builder.Services.AddScoped<IEmployeeSchedule, EmployeeScheduleService>();
         builder.Services.AddScoped<AccountProvisioner>();
     }
 
@@ -222,6 +223,23 @@ public static class AuthenticationSetup
             catch (InvalidOperationException error) { return Results.Json(new { error = error.Message }, statusCode: 503); }
             catch (ArgumentException error) { return PublicBookingValidation(error); }
         });
+        app.MapGet("/employees/{id:guid}/schedule", async (Guid id, DateOnly date, string view, HttpContext context, IEmployeeSchedule schedules, CancellationToken ct) =>
+        {
+            try
+            {
+                return Results.Ok(await schedules.Query(UserId(context), id, date, view ?? "day", ct));
+            }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+            catch (ArgumentException error)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["view"] = [error.Message] });
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["date"] = ["Salon time zone is invalid."] });
+            }
+        }).RequireAuthorization();
         app.MapGet("/employees", async (HttpContext context, IEmployeeDirectory employees, CancellationToken ct) =>
         {
             try { return Results.Ok(await employees.List(UserId(context), ct)); }
