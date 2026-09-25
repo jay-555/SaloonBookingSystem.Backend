@@ -17,6 +17,8 @@ public sealed class SalonDbContext(DbContextOptions<SalonDbContext> options) : I
     public DbSet<EmployeeBreak> EmployeeBreaks => Set<EmployeeBreak>();
     public DbSet<SeatService> SeatServices => Set<SeatService>();
     public DbSet<ServiceResourceRequirement> ServiceResourceRequirements => Set<ServiceResourceRequirement>();
+    public DbSet<Booking> Bookings => Set<Booking>();
+    public DbSet<EmployeeLeave> EmployeeLeaves => Set<EmployeeLeave>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -74,6 +76,33 @@ public sealed class SalonDbContext(DbContextOptions<SalonDbContext> options) : I
             requirement.ToTable("ServiceResourceRequirements", table => table.HasCheckConstraint(
                 "CK_ServiceResourceRequirements_Rules",
                 "\"EmployeeCapacity\" = 1 AND btrim(\"SeatType\", U&'\\0009\\000A\\000B\\000C\\000D\\0020\\0085\\00A0\\1680\\2000\\2001\\2002\\2003\\2004\\2005\\2006\\2007\\2008\\2009\\200A\\2028\\2029\\202F\\205F\\3000') <> '' AND \"BufferMinutes\" >= 0"));
+        });
+        modelBuilder.Entity<Booking>(booking =>
+        {
+            booking.HasKey(x => x.Id);
+            booking.Property(x => x.Id).ValueGeneratedNever();
+            booking.Property(x => x.StartsAtUtc).IsRequired();
+            booking.Property(x => x.EndsAtUtc).IsRequired();
+            booking.HasIndex(x => x.SalonId);
+            booking.HasIndex(x => x.EmployeeId);
+            booking.HasIndex(x => x.SeatId);
+            booking.HasOne<SalonEntity>().WithMany().HasForeignKey(x => x.SalonId).OnDelete(DeleteBehavior.Restrict);
+            booking.HasOne<Service>().WithMany().HasForeignKey(x => x.ServiceId).OnDelete(DeleteBehavior.Restrict);
+            booking.HasOne<Employee>().WithMany().HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Restrict);
+            booking.HasOne<Seat>().WithMany().HasForeignKey(x => x.SeatId).OnDelete(DeleteBehavior.Restrict);
+            booking.ToTable("Bookings", table => table.HasCheckConstraint("CK_Bookings_Range",
+                "\"Id\" <> '00000000-0000-0000-0000-000000000000'::uuid AND \"EndsAtUtc\" > \"StartsAtUtc\""));
+        });
+        modelBuilder.Entity<EmployeeLeave>(leave =>
+        {
+            leave.HasKey(x => x.Id);
+            leave.Property(x => x.Id).ValueGeneratedNever();
+            leave.Property(x => x.StartsAtUtc).IsRequired();
+            leave.Property(x => x.EndsAtUtc).IsRequired();
+            leave.HasIndex(x => x.EmployeeId);
+            leave.HasOne<Employee>().WithMany().HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Cascade);
+            leave.ToTable("EmployeeLeaves", table => table.HasCheckConstraint("CK_EmployeeLeaves_Range",
+                "\"Id\" <> '00000000-0000-0000-0000-000000000000'::uuid AND \"EndsAtUtc\" > \"StartsAtUtc\""));
         });
     }
 }
