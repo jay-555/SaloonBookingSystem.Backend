@@ -14,6 +14,28 @@
           "Swashbuckle.AspNetCore.SwaggerUI": "10.2.3"
         }
       },
+      "Microsoft.AspNetCore.Cryptography.Internal": {
+        "type": "Transitive",
+        "resolved": "8.0.31",
+        "contentHash": "CnnMYle9GDJJq0/PkfhAwfU6nEb/xUGAt26vPojvOlhSqmuNw+ocTbIVFnp5X2f5dHjaC/kzHdxzwn3h5ggjWA=="
+      },
+      "Microsoft.AspNetCore.Cryptography.KeyDerivation": {
+        "type": "Transitive",
+        "resolved": "8.0.31",
+        "contentHash": "zuhxgMp1Ju68Q7Yx63jnSoJgbUBvKeFWbbx9GU/ii4rSYLZ9mID2zc+1ZhuCyeNrOQipghAN5OCp/kXtO5gmEA==",
+        "dependencies": {
+          "Microsoft.AspNetCore.Cryptography.Internal": "8.0.31"
+        }
+      },
+      "Microsoft.AspNetCore.Identity.EntityFrameworkCore": {
+        "type": "Transitive",
+        "resolved": "8.0.31",
+        "contentHash": "rj2QE3q22OslDtR6CkzFYbdnD0XyoPbwnTbL4uCXbnQvENJdKPNeg54ln1gyQco9wTCnmTmervwdZ6qm02/Exg==",
+        "dependencies": {
+          "Microsoft.EntityFrameworkCore.Relational": "8.0.31",
+          "Microsoft.Extensions.Identity.Stores": "8.0.31"
+        }
+      },
       "Microsoft.EntityFrameworkCore": {
         "type": "Transitive",
         "resolved": "8.0.31",
@@ -89,6 +111,26 @@
         "type": "Transitive",
         "resolved": "8.0.2",
         "contentHash": "3iE7UF7MQkCv1cxzCahz+Y/guQbTqieyxyaWKhrRO91itI9cOKO76OHeQDahqG4MmW5umr3CcCvGmK92lWNlbg=="
+      },
+      "Microsoft.Extensions.Identity.Core": {
+        "type": "Transitive",
+        "resolved": "8.0.31",
+        "contentHash": "92fwQYM9bVFZ8b8AABG5ILWAL68IkUYusQuJovqBkt56MSTsFj0CLayRtSaB7HHNCB1um2K9Ee7Bo4NsdmQrYg==",
+        "dependencies": {
+          "Microsoft.AspNetCore.Cryptography.KeyDerivation": "8.0.31",
+          "Microsoft.Extensions.Logging": "8.0.1",
+          "Microsoft.Extensions.Options": "8.0.2"
+        }
+      },
+      "Microsoft.Extensions.Identity.Stores": {
+        "type": "Transitive",
+        "resolved": "8.0.31",
+        "contentHash": "2Brnjlmj+HBg3IWmG/wYSsz39WiC6yF+aQrpiUaXBFKEhfTGPs3tnWwKXTn22L/Nno9FFja27rGxAQTxRUCsng==",
+        "dependencies": {
+          "Microsoft.Extensions.Caching.Abstractions": "8.0.0",
+          "Microsoft.Extensions.Identity.Core": "8.0.31",
+          "Microsoft.Extensions.Logging": "8.0.1"
+        }
       },
       "Microsoft.Extensions.Logging": {
         "type": "Transitive",
@@ -187,6 +229,7 @@
       "salon.infrastructure": {
         "type": "Project",
         "dependencies": {
+          "Microsoft.AspNetCore.Identity.EntityFrameworkCore": "[8.0.31, )",
           "Microsoft.EntityFrameworkCore": "[8.0.31, )",
           "Microsoft.EntityFrameworkCore.Relational": "[8.0.31, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[8.0.11, )",

@@ -14,4 +14,12 @@ public sealed class Salon
     public Guid Id { get; private set; }
     public string Name { get; private set; }
     public string TimeZoneId { get; private set; }
+
+    public void UpdateProfile(string name, string timeZoneId)
+    {
+        var validName = DomainGuard.Text(name, nameof(name));
+        var validZone = DomainGuard.IanaTimeZone(timeZoneId, nameof(timeZoneId));
+        Name = validName;
+        TimeZoneId = validZone;
+    }
 }

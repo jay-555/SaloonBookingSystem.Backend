@@ -7,6 +7,7 @@ RUN dotnet publish src/Salon.Api/Salon.Api.csproj -c Release --no-restore -o /ap
 FROM mcr.microsoft.com/dotnet/aspnet:8.0.31-bookworm-slim AS runtime
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /home/app/keys && chown app:app /home/app/keys
 WORKDIR /app
 COPY --from=build /app .
 ENV ASPNETCORE_HTTP_PORTS=8080

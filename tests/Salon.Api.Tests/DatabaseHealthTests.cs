@@ -10,7 +10,7 @@ public sealed class DatabaseHealthTests
     [Trait("Category", "Container")]
     public async Task Readiness_tracks_real_database_outage_and_recovery()
     {
-        await using var database = new PostgreSqlBuilder("postgres:17-alpine").Build();
+        await using var database = new TestDatabase();
         await database.StartAsync();
         await using var factory = new ApiFactory(database.GetConnectionString() + ";Timeout=2;Pooling=false");
         using var client = factory.CreateClient();

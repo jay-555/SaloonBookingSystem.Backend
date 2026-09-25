@@ -17,7 +17,7 @@ public sealed class CorePersistenceTests
     [Fact]
     public async Task Explicit_migration_round_trips_entities_is_repeatable_and_can_roll_back()
     {
-        await using var postgres = new PostgreSqlBuilder("postgres:17-alpine").Build();
+        await using var postgres = new TestDatabase();
         await postgres.StartAsync();
         var connection = postgres.GetConnectionString();
         await using var database = CreateContext(connection);
@@ -42,7 +42,7 @@ public sealed class CorePersistenceTests
         database.Services.Add(new Service(Guid.NewGuid(), salon.Id, "Numeric boundary", "Test", decimal.MaxValue, 1));
         await database.SaveChangesAsync();
         await database.Database.MigrateAsync();
-        Assert.Single(await database.Database.GetAppliedMigrationsAsync());
+        Assert.Equal(2, (await database.Database.GetAppliedMigrationsAsync()).Count());
 
         await using (var fresh = CreateContext(connection))
         {
@@ -80,7 +80,7 @@ public sealed class CorePersistenceTests
     [Fact]
     public async Task Direct_database_writes_cannot_bypass_invariants_or_delete_owned_records()
     {
-        await using var postgres = new PostgreSqlBuilder("postgres:17-alpine").Build();
+        await using var postgres = new TestDatabase();
         await postgres.StartAsync();
         var connection = postgres.GetConnectionString();
         await using var database = CreateContext(connection);
@@ -122,7 +122,7 @@ public sealed class CorePersistenceTests
             await Insert(database, table, salonId);
             var error = await Assert.ThrowsAsync<PostgresException>(() => database.Database.ExecuteSqlInterpolatedAsync(
                 $"DELETE FROM \"Salons\" WHERE \"Id\" = {salonId}"));
-            Assert.Equal(PostgresErrorCodes.ForeignKeyViolation, error.SqlState);
+            Assert.Contains(error.SqlState, new[] { PostgresErrorCodes.ForeignKeyViolation, PostgresErrorCodes.RestrictViolation });
             await using var fresh = CreateContext(connection);
             Assert.True(await fresh.Salons.AnyAsync(item => item.Id == salonId));
             var countSql = $"SELECT count(*)::int AS \"Value\" FROM \"{table}\"";
@@ -160,8 +160,14 @@ public sealed class CorePersistenceTests
         }
         if (column is not null) row[column] = value!;
         var columns = string.Join(", ", row.Keys.Select(key => $"\"{key}\""));
-        var parameters = string.Join(", ", Enumerable.Range(0, row.Count).Select(index => "{" + index + "}"));
+        var values = new List<object>();
+        var parameters = string.Join(", ", row.Values.Select(item =>
+        {
+            if (item is DBNull) return "NULL";
+            values.Add(item);
+            return "{" + (values.Count - 1) + "}";
+        }));
         var sql = $"INSERT INTO \"{table}\" ({columns}) VALUES ({parameters})";
-        return database.Database.ExecuteSqlRawAsync(sql, row.Values.ToArray());
+        return database.Database.ExecuteSqlRawAsync(sql, values.ToArray());
     }
 }

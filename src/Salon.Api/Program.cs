@@ -1,3 +1,4 @@
+using Salon.Api;
 using Microsoft.EntityFrameworkCore;
 using Salon.Application;
 using Salon.Infrastructure;
@@ -18,7 +19,14 @@ builder.Services.AddCors(options => options.AddDefaultPolicy(policy =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+builder.AddSalonAuthentication();
 var app = builder.Build();
+if (args.FirstOrDefault() == "provision")
+{
+    Environment.ExitCode = await ProvisionCommand.Run(app.Services, args);
+    return;
+}
+app.MapSalonEndpoints();
 app.UseCors();
 app.UseSwagger();
 app.UseSwaggerUI();
