@@ -19,5 +19,13 @@ public sealed class BookingEntityTests
         Assert.Throws<ArgumentException>(() => new Booking(Guid.Empty, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), start, end));
         Assert.Throws<ArgumentException>(() => new Booking(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), start, end, Guid.Empty));
         Assert.Throws<ArgumentException>(() => new EmployeeLeave(Guid.NewGuid(), Guid.NewGuid(), end, start));
+
+        var active = new Booking(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), start, end);
+        active.Reschedule(Guid.NewGuid(), Guid.NewGuid(), start.AddHours(2), end.AddHours(2));
+        Assert.Equal(start.AddHours(2), active.StartsAtUtc);
+        active.Cancel(DateTimeOffset.Parse("2026-09-28T12:00:00Z"));
+        Assert.False(active.IsActive);
+        Assert.Throws<InvalidOperationException>(() => active.Cancel(DateTimeOffset.UtcNow));
+        Assert.Throws<InvalidOperationException>(() => active.Reschedule(Guid.NewGuid(), Guid.NewGuid(), start, end));
     }
 }

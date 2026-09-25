@@ -35,7 +35,7 @@ public sealed class SeatScheduleService(SalonDbContext database) : ISeatSchedule
             from booking in database.Bookings.AsNoTracking()
             join service in database.Services.AsNoTracking() on booking.ServiceId equals service.Id
             join employee in database.Employees.AsNoTracking() on booking.EmployeeId equals employee.Id
-            where booking.SeatId == seatId && booking.StartsAtUtc < rangeEndUtc && booking.EndsAtUtc > rangeStartUtc
+            where booking.SeatId == seatId && booking.CancelledAtUtc == null && booking.StartsAtUtc < rangeEndUtc && booking.EndsAtUtc > rangeStartUtc
             select new EmployeeScheduleCalendar.BookingSlice(
                 booking.Id,
                 booking.StartsAtUtc,

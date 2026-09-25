@@ -18,6 +18,7 @@ public sealed class SalonDbContext(DbContextOptions<SalonDbContext> options) : I
     public DbSet<SeatService> SeatServices => Set<SeatService>();
     public DbSet<ServiceResourceRequirement> ServiceResourceRequirements => Set<ServiceResourceRequirement>();
     public DbSet<Booking> Bookings => Set<Booking>();
+    public DbSet<BookingAudit> BookingAudits => Set<BookingAudit>();
     public DbSet<EmployeeLeave> EmployeeLeaves => Set<EmployeeLeave>();
     public DbSet<Customer> Customers => Set<Customer>();
 
@@ -94,6 +95,21 @@ public sealed class SalonDbContext(DbContextOptions<SalonDbContext> options) : I
             booking.HasOne<Customer>().WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
             booking.ToTable("Bookings", table => table.HasCheckConstraint("CK_Bookings_Range",
                 "\"Id\" <> '00000000-0000-0000-0000-000000000000'::uuid AND \"EndsAtUtc\" > \"StartsAtUtc\""));
+        });
+        modelBuilder.Entity<BookingAudit>(audit =>
+        {
+            audit.HasKey(x => x.Id);
+            audit.Property(x => x.Id).ValueGeneratedNever();
+            audit.Property(x => x.Operation).IsRequired();
+            audit.HasIndex(x => x.BookingId);
+            audit.HasIndex(x => x.SalonId);
+            audit.HasOne<Booking>().WithMany().HasForeignKey(x => x.BookingId).OnDelete(DeleteBehavior.Restrict);
+            audit.HasOne<SalonEntity>().WithMany().HasForeignKey(x => x.SalonId).OnDelete(DeleteBehavior.Restrict);
+            audit.ToTable("BookingAudits", table =>
+            {
+                table.HasCheckConstraint("CK_BookingAudits_Id", "\"Id\" <> '00000000-0000-0000-0000-000000000000'::uuid");
+                table.HasCheckConstraint("CK_BookingAudits_Operation", "\"Operation\" IN ('Reschedule','Cancel')");
+            });
         });
         modelBuilder.Entity<EmployeeLeave>(leave =>
         {

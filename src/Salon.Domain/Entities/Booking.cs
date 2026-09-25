@@ -26,4 +26,25 @@ public sealed class Booking
     public Guid? CustomerId { get; private set; }
     public DateTimeOffset StartsAtUtc { get; private set; }
     public DateTimeOffset EndsAtUtc { get; private set; }
+    public DateTimeOffset? CancelledAtUtc { get; private set; }
+    public bool IsActive => CancelledAtUtc is null;
+
+    public void Reschedule(Guid employeeId, Guid seatId, DateTimeOffset startsAtUtc, DateTimeOffset endsAtUtc)
+    {
+        if (CancelledAtUtc is not null)
+            throw new InvalidOperationException("Cancelled booking cannot be rescheduled.");
+        EmployeeId = DomainGuard.Id(employeeId, nameof(employeeId));
+        SeatId = DomainGuard.Id(seatId, nameof(seatId));
+        if (endsAtUtc <= startsAtUtc)
+            throw new ArgumentException("Booking end must be after start.", nameof(endsAtUtc));
+        StartsAtUtc = startsAtUtc.ToUniversalTime();
+        EndsAtUtc = endsAtUtc.ToUniversalTime();
+    }
+
+    public void Cancel(DateTimeOffset atUtc)
+    {
+        if (CancelledAtUtc is not null)
+            throw new InvalidOperationException("Booking is already cancelled.");
+        CancelledAtUtc = atUtc.ToUniversalTime();
+    }
 }
