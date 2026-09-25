@@ -236,8 +236,37 @@ OwnerAdmin and Manager can query free single-service slots:
 Returns salon-local `startsAtLocal` (`HH:mm`) and `startsAtUtc`, plus a
 candidate employee/seat pair. Checks working hours, breaks, leave, existing
 bookings, Phase 6 buffer, and seats of the required type that support the
-service. Employee and anonymous callers receive 403/401. Phase 8 will wire
-the public `/book` UI to this engine.
+service. Employee and anonymous callers receive 403/401. Phase 8 wires the
+public `/book` UI to this engine.
+
+## Phase 8: customer booking flow
+
+Apply the additive `CustomerBookingFlow` migration after Phase 7:
+
+```powershell
+dotnet ef database update --project src/Salon.Infrastructure
+```
+
+Adds `Customers` and optional `Bookings.CustomerId`. Public anonymous APIs reuse
+the Phase 7 availability engine for a single targeted salon:
+
+| API | Behavior |
+|---|---|
+| GET `/public/salon` | Public salon name and time zone |
+| GET `/public/services` | Bookable services only (requirements + skilled employee + supporting seat) |
+| GET `/public/services/{id}/employees` | Skilled employees for a bookable service |
+| GET `/public/availability` | Same query shape as admin availability; salon from server config |
+| POST `/public/bookings` | Create booking + customer; CSRF required; 409 if slot taken |
+
+Salon targeting: set `Booking:PublicSalonId` (env `Booking__PublicSalonId`) to the
+public salon GUID when more than one salon exists. If the setting is empty and
+exactly one salon is present, that salon is used. Responses never accept an
+arbitrary client-supplied salon GUID.
+
+Phone validation expects a 10-digit Indian mobile (optional `+91` prefix). Email
+is optional. Reserved window = service duration + Phase 6 buffer. Frontend
+`/book` is the stepped customer UI; the session proxy allowlists the public
+routes above.
 
 Browser sessions use Identity cookies with an eight-hour absolute lifetime and
 no remember-me or sliding renewal. Cookies are HttpOnly, host-only, SameSite=Lax,

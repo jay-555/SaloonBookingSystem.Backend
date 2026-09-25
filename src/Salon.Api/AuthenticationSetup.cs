@@ -52,6 +52,7 @@ public static class AuthenticationSetup
         builder.Services.AddScoped<ISeatDirectory, SeatDirectory>();
         builder.Services.AddScoped<IServiceCatalog, ServiceCatalog>();
         builder.Services.AddScoped<IAvailabilityService, AvailabilityService>();
+        builder.Services.AddScoped<IPublicBooking, PublicBookingService>();
         builder.Services.AddScoped<AccountProvisioner>();
     }
 
@@ -179,6 +180,48 @@ public static class AuthenticationSetup
                 return Results.ValidationProblem(new Dictionary<string, string[]> { ["date"] = ["Salon time zone is invalid."] });
             }
         }).RequireAuthorization();
+        app.MapGet("/public/salon", async (IPublicBooking booking, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await booking.Salon(ct)); }
+            catch (InvalidOperationException error) { return Results.Json(new { error = error.Message }, statusCode: 503); }
+        });
+        app.MapGet("/public/services", async (IPublicBooking booking, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await booking.Services(ct)); }
+            catch (InvalidOperationException error) { return Results.Json(new { error = error.Message }, statusCode: 503); }
+        });
+        app.MapGet("/public/services/{serviceId:guid}/employees", async (Guid serviceId, IPublicBooking booking, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await booking.Employees(serviceId, ct)); }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+            catch (InvalidOperationException error) { return Results.Json(new { error = error.Message }, statusCode: 503); }
+        });
+        app.MapGet("/public/availability", async (Guid serviceId, DateOnly date, Guid? employeeId, IPublicBooking booking, CancellationToken ct) =>
+        {
+            try
+            {
+                return Results.Ok(await booking.Availability(new AvailabilityQuery(serviceId, date, employeeId), ct));
+            }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+            catch (InvalidOperationException error) { return Results.Json(new { error = error.Message }, statusCode: 503); }
+            catch (ArgumentException error)
+            {
+                var field = error.ParamName switch { "employeeId" => "employeeId", _ => "serviceId" };
+                return Results.ValidationProblem(new Dictionary<string, string[]> { [field] = [error.Message] });
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["date"] = ["Salon time zone is invalid."] });
+            }
+        });
+        app.MapPost("/public/bookings", async (CreatePublicBookingInput input, IPublicBooking booking, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await booking.Create(input, ct)); }
+            catch (SlotUnavailableException error) { return Results.Conflict(new { error = error.Message }); }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+            catch (InvalidOperationException error) { return Results.Json(new { error = error.Message }, statusCode: 503); }
+            catch (ArgumentException error) { return PublicBookingValidation(error); }
+        });
         app.MapGet("/employees", async (HttpContext context, IEmployeeDirectory employees, CancellationToken ct) =>
         {
             try { return Results.Ok(await employees.List(UserId(context), ct)); }
@@ -258,7 +301,23 @@ public static class AuthenticationSetup
     private static bool IsProtectedApi(PathString path) =>
         path.StartsWithSegments("/auth") || path.StartsWithSegments("/salon") ||
         path.StartsWithSegments("/employees") || path.StartsWithSegments("/services") ||
-        path.StartsWithSegments("/seats") || path.StartsWithSegments("/availability");
+        path.StartsWithSegments("/seats") || path.StartsWithSegments("/availability") ||
+        path.StartsWithSegments("/public");
+
+    private static IResult PublicBookingValidation(ArgumentException error)
+    {
+        var field = error.ParamName switch
+        {
+            "name" or "CustomerName" => "customerName",
+            "phone" or "CustomerPhone" => "customerPhone",
+            "email" or "CustomerEmail" => "customerEmail",
+            "StartsAtLocal" or "startsAtLocal" => "startsAtLocal",
+            "serviceId" => "serviceId",
+            "employeeId" => "employeeId",
+            _ => "customerName",
+        };
+        return Results.ValidationProblem(new Dictionary<string, string[]> { [field] = [error.Message] });
+    }
 
     private static Guid UserId(HttpContext context) => Guid.Parse(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 

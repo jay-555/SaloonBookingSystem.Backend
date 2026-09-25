@@ -9,4 +9,5 @@ public sealed record AvailabilityResult(Guid ServiceId, DateOnly Date, string Ti
 public interface IAvailabilityService
 {
     Task<AvailabilityResult> Query(Guid userId, AvailabilityQuery query, CancellationToken cancellationToken);
+    Task<AvailabilityResult> QueryForSalon(Guid salonId, AvailabilityQuery query, CancellationToken cancellationToken);
 }

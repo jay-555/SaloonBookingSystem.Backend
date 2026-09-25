@@ -19,6 +19,7 @@ public sealed class SalonDbContext(DbContextOptions<SalonDbContext> options) : I
     public DbSet<ServiceResourceRequirement> ServiceResourceRequirements => Set<ServiceResourceRequirement>();
     public DbSet<Booking> Bookings => Set<Booking>();
     public DbSet<EmployeeLeave> EmployeeLeaves => Set<EmployeeLeave>();
+    public DbSet<Customer> Customers => Set<Customer>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -90,6 +91,7 @@ public sealed class SalonDbContext(DbContextOptions<SalonDbContext> options) : I
             booking.HasOne<Service>().WithMany().HasForeignKey(x => x.ServiceId).OnDelete(DeleteBehavior.Restrict);
             booking.HasOne<Employee>().WithMany().HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Restrict);
             booking.HasOne<Seat>().WithMany().HasForeignKey(x => x.SeatId).OnDelete(DeleteBehavior.Restrict);
+            booking.HasOne<Customer>().WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
             booking.ToTable("Bookings", table => table.HasCheckConstraint("CK_Bookings_Range",
                 "\"Id\" <> '00000000-0000-0000-0000-000000000000'::uuid AND \"EndsAtUtc\" > \"StartsAtUtc\""));
         });
@@ -103,6 +105,21 @@ public sealed class SalonDbContext(DbContextOptions<SalonDbContext> options) : I
             leave.HasOne<Employee>().WithMany().HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Cascade);
             leave.ToTable("EmployeeLeaves", table => table.HasCheckConstraint("CK_EmployeeLeaves_Range",
                 "\"Id\" <> '00000000-0000-0000-0000-000000000000'::uuid AND \"EndsAtUtc\" > \"StartsAtUtc\""));
+        });
+        modelBuilder.Entity<Customer>(customer =>
+        {
+            customer.HasKey(x => x.Id);
+            customer.Property(x => x.Id).ValueGeneratedNever();
+            customer.Property(x => x.Name).IsRequired();
+            customer.Property(x => x.Phone).IsRequired();
+            customer.HasIndex(x => x.SalonId);
+            customer.HasOne<SalonEntity>().WithMany().HasForeignKey(x => x.SalonId).OnDelete(DeleteBehavior.Restrict);
+            customer.ToTable("Customers", table =>
+            {
+                table.HasCheckConstraint("CK_Customers_Id", "\"Id\" <> '00000000-0000-0000-0000-000000000000'::uuid");
+                table.HasCheckConstraint("CK_Customers_Name", "btrim(\"Name\", U&'\\0009\\000A\\000B\\000C\\000D\\0020\\0085\\00A0\\1680\\2000\\2001\\2002\\2003\\2004\\2005\\2006\\2007\\2008\\2009\\200A\\2028\\2029\\202F\\205F\\3000') <> ''");
+                table.HasCheckConstraint("CK_Customers_Phone", "char_length(\"Phone\") = 10");
+            });
         });
     }
 }
