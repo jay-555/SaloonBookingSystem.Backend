@@ -12,4 +12,6 @@ public sealed class Employee
     public Guid Id { get; private set; }
     public Guid SalonId { get; private set; }
     public string Name { get; private set; }
+
+    public void Rename(string name) => Name = DomainGuard.Text(name, nameof(name));
 }
