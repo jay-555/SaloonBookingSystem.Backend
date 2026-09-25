@@ -51,6 +51,7 @@ public static class AuthenticationSetup
         builder.Services.AddScoped<IEmployeeDirectory, EmployeeDirectory>();
         builder.Services.AddScoped<ISeatDirectory, SeatDirectory>();
         builder.Services.AddScoped<IServiceCatalog, ServiceCatalog>();
+        builder.Services.AddScoped<IAvailabilityService, AvailabilityService>();
         builder.Services.AddScoped<AccountProvisioner>();
     }
 
@@ -160,6 +161,24 @@ public static class AuthenticationSetup
             catch (UnauthorizedAccessException) { return Results.Forbid(); }
             catch (KeyNotFoundException) { return Results.NotFound(); }
         }).RequireAuthorization();
+        app.MapGet("/availability", async (Guid serviceId, DateOnly date, Guid? employeeId, HttpContext context, IAvailabilityService availability, CancellationToken ct) =>
+        {
+            try
+            {
+                return Results.Ok(await availability.Query(UserId(context), new AvailabilityQuery(serviceId, date, employeeId), ct));
+            }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+            catch (ArgumentException error)
+            {
+                var field = error.ParamName switch { "employeeId" => "employeeId", _ => "serviceId" };
+                return Results.ValidationProblem(new Dictionary<string, string[]> { [field] = [error.Message] });
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["date"] = ["Salon time zone is invalid."] });
+            }
+        }).RequireAuthorization();
         app.MapGet("/employees", async (HttpContext context, IEmployeeDirectory employees, CancellationToken ct) =>
         {
             try { return Results.Ok(await employees.List(UserId(context), ct)); }
@@ -239,7 +258,7 @@ public static class AuthenticationSetup
     private static bool IsProtectedApi(PathString path) =>
         path.StartsWithSegments("/auth") || path.StartsWithSegments("/salon") ||
         path.StartsWithSegments("/employees") || path.StartsWithSegments("/services") ||
-        path.StartsWithSegments("/seats");
+        path.StartsWithSegments("/seats") || path.StartsWithSegments("/availability");
 
     private static Guid UserId(HttpContext context) => Guid.Parse(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 

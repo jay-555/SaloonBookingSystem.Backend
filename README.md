@@ -217,6 +217,28 @@ can read requirements on service detail. REST:
 `GET /services/{id}`). Admin UI is on the service editor under
 `/admin/services/{id}`.
 
+## Phase 7: booking engine core
+
+Apply the additive `BookingEngineCore` migration after Phase 6:
+
+```powershell
+dotnet ef database update --project src/Salon.Infrastructure
+```
+
+Adds `Bookings` and `EmployeeLeaves` tables, with PostgreSQL GiST
+`EXCLUDE` constraints preventing overlapping bookings per employee and per
+seat (`btree_gist`). There is **no** public booking-create API in this phase.
+
+OwnerAdmin and Manager can query free single-service slots:
+
+`GET /availability?serviceId={guid}&date=yyyy-MM-dd&employeeId={guid?}`
+
+Returns salon-local `startsAtLocal` (`HH:mm`) and `startsAtUtc`, plus a
+candidate employee/seat pair. Checks working hours, breaks, leave, existing
+bookings, Phase 6 buffer, and seats of the required type that support the
+service. Employee and anonymous callers receive 403/401. Phase 8 will wire
+the public `/book` UI to this engine.
+
 Browser sessions use Identity cookies with an eight-hour absolute lifetime and
 no remember-me or sliding renewal. Cookies are HttpOnly, host-only, SameSite=Lax,
 and Secure outside Development. Development over HTTP is for loopback local use
