@@ -279,6 +279,17 @@ Returns salon-local timeline items (`booking`, `break`, `leave`) with labels
 and optional seat name for bookings. Employee Identity accounts receive 403 —
 Identity↔Employee linking for self-view is deferred. Admin UI: `/admin/calendar`.
 
+## Phase 10: seat calendar (read view)
+
+No new migration. OwnerAdmin and Manager can read a seat day or week schedule
+(Monday-start weeks) from existing bookings on that seat:
+
+`GET /seats/{id}/schedule?date=yyyy-MM-dd&view=day|week`
+
+Returns salon-local booking items (service · employee labels). Employee
+Identity accounts receive 403. Admin UI: `/admin/seats/calendar`. Reuses Phase 9
+schedule assembly; seats have no breaks/leave.
+
 Browser sessions use Identity cookies with an eight-hour absolute lifetime and
 no remember-me or sliding renewal. Cookies are HttpOnly, host-only, SameSite=Lax,
 and Secure outside Development. Development over HTTP is for loopback local use
