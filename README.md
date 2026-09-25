@@ -268,6 +268,17 @@ is optional. Reserved window = service duration + Phase 6 buffer. Frontend
 `/book` is the stepped customer UI; the session proxy allowlists the public
 routes above.
 
+## Phase 9: employee calendar (read view)
+
+No new migration. OwnerAdmin and Manager can read an employee day or week
+schedule (Monday-start weeks) from existing bookings, breaks, and leave:
+
+`GET /employees/{id}/schedule?date=yyyy-MM-dd&view=day|week`
+
+Returns salon-local timeline items (`booking`, `break`, `leave`) with labels
+and optional seat name for bookings. Employee Identity accounts receive 403 —
+Identity↔Employee linking for self-view is deferred. Admin UI: `/admin/calendar`.
+
 Browser sessions use Identity cookies with an eight-hour absolute lifetime and
 no remember-me or sliding renewal. Cookies are HttpOnly, host-only, SameSite=Lax,
 and Secure outside Development. Development over HTTP is for loopback local use
