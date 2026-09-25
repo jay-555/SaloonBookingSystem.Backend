@@ -54,6 +54,7 @@ public static class AuthenticationSetup
         builder.Services.AddScoped<IAvailabilityService, AvailabilityService>();
         builder.Services.AddScoped<IPublicBooking, PublicBookingService>();
         builder.Services.AddScoped<IEmployeeSchedule, EmployeeScheduleService>();
+        builder.Services.AddScoped<ISeatSchedule, SeatScheduleService>();
         builder.Services.AddScoped<AccountProvisioner>();
     }
 
@@ -276,6 +277,23 @@ public static class AuthenticationSetup
             }
             catch (UnauthorizedAccessException) { return Results.Forbid(); }
             catch (KeyNotFoundException) { return Results.NotFound(); }
+        }).RequireAuthorization();
+        app.MapGet("/seats/{id:guid}/schedule", async (Guid id, DateOnly date, string view, HttpContext context, ISeatSchedule schedules, CancellationToken ct) =>
+        {
+            try
+            {
+                return Results.Ok(await schedules.Query(UserId(context), id, date, view ?? "day", ct));
+            }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+            catch (ArgumentException error)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["view"] = [error.Message] });
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["date"] = ["Salon time zone is invalid."] });
+            }
         }).RequireAuthorization();
         app.MapGet("/seats", async (HttpContext context, ISeatDirectory seats, CancellationToken ct) =>
         {
