@@ -157,6 +157,21 @@ than a many-to-many role collection. Every protected operation resolves current
 membership from PostgreSQL. Only OwnerAdmin can create/edit; staff can read their
 own salon. Accounts and scheduling Employee entities are independent.
 
+## Phase 3: employee management
+
+Apply the additive `EmployeeManagement` migration after Phase 2:
+
+```powershell
+dotnet ef database update --project src/Salon.Infrastructure
+```
+
+OwnerAdmin can create, update, and delete employees for their salon, including
+service skills (same-salon services only), weekly hours, and breaks. Manager can
+list and read. Identity accounts remain separate from Employee rows. Hard delete
+is allowed while no booking dependents exist. REST: `GET/POST /employees`,
+`GET/PUT/DELETE /employees/{id}`, and `GET /services` for skill selection.
+Admin UI lives at `/admin/employees` on the frontend.
+
 Browser sessions use Identity cookies with an eight-hour absolute lifetime and
 no remember-me or sliding renewal. Cookies are HttpOnly, host-only, SameSite=Lax,
 and Secure outside Development. Development over HTTP is for loopback local use

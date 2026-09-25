@@ -12,6 +12,9 @@ public sealed class SalonDbContext(DbContextOptions<SalonDbContext> options) : I
     public DbSet<Seat> Seats => Set<Seat>();
     public DbSet<Service> Services => Set<Service>();
     public DbSet<WorkingDay> WorkingDays => Set<WorkingDay>();
+    public DbSet<EmployeeSkill> EmployeeSkills => Set<EmployeeSkill>();
+    public DbSet<EmployeeWorkingDay> EmployeeWorkingDays => Set<EmployeeWorkingDay>();
+    public DbSet<EmployeeBreak> EmployeeBreaks => Set<EmployeeBreak>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -30,6 +33,29 @@ public sealed class SalonDbContext(DbContextOptions<SalonDbContext> options) : I
             day.HasOne<SalonEntity>().WithMany().HasForeignKey(x => x.SalonId).OnDelete(DeleteBehavior.Restrict);
             day.ToTable("WorkingDays", table => table.HasCheckConstraint("CK_WorkingDays_Interval",
                 "\"Day\" BETWEEN 0 AND 6 AND ((\"OpensAt\" IS NULL AND \"ClosesAt\" IS NULL) OR (\"OpensAt\" IS NOT NULL AND \"ClosesAt\" IS NOT NULL AND \"OpensAt\" >= 0 AND \"ClosesAt\" <= 1439 AND \"OpensAt\" < \"ClosesAt\"))"));
+        });
+        modelBuilder.Entity<EmployeeSkill>(skill =>
+        {
+            skill.HasKey(x => new { x.EmployeeId, x.ServiceId });
+            skill.HasOne<Employee>().WithMany().HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Cascade);
+            skill.HasOne<Service>().WithMany().HasForeignKey(x => x.ServiceId).OnDelete(DeleteBehavior.Restrict);
+            skill.ToTable("EmployeeSkills");
+        });
+        modelBuilder.Entity<EmployeeWorkingDay>(day =>
+        {
+            day.HasKey(x => new { x.EmployeeId, x.Day });
+            day.HasOne<Employee>().WithMany().HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Cascade);
+            day.ToTable("EmployeeWorkingDays", table => table.HasCheckConstraint("CK_EmployeeWorkingDays_Interval",
+                "\"Day\" BETWEEN 0 AND 6 AND ((\"OpensAt\" IS NULL AND \"ClosesAt\" IS NULL) OR (\"OpensAt\" IS NOT NULL AND \"ClosesAt\" IS NOT NULL AND \"OpensAt\" >= 0 AND \"ClosesAt\" <= 1439 AND \"OpensAt\" < \"ClosesAt\"))"));
+        });
+        modelBuilder.Entity<EmployeeBreak>(item =>
+        {
+            item.HasKey(x => x.Id);
+            item.Property(x => x.Id).ValueGeneratedNever();
+            item.HasOne<Employee>().WithMany().HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Cascade);
+            item.HasIndex(x => x.EmployeeId);
+            item.ToTable("EmployeeBreaks", table => table.HasCheckConstraint("CK_EmployeeBreaks_Interval",
+                "\"Day\" BETWEEN 0 AND 6 AND \"StartsAt\" >= 0 AND \"EndsAt\" <= 1439 AND \"StartsAt\" < \"EndsAt\""));
         });
     }
 }

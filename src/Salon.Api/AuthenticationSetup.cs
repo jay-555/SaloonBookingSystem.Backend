@@ -48,6 +48,7 @@ public static class AuthenticationSetup
         if (builder.Configuration["DataProtection:KeyPath"] is string path)
             protection.PersistKeysToFileSystem(new DirectoryInfo(path));
         builder.Services.AddScoped<ISalonProfiles, SalonProfiles>();
+        builder.Services.AddScoped<IEmployeeDirectory, EmployeeDirectory>();
         builder.Services.AddScoped<AccountProvisioner>();
     }
 
@@ -57,7 +58,7 @@ public static class AuthenticationSetup
         app.UseAuthorization();
         app.Use(async (context, next) =>
         {
-            if (context.Request.Path.StartsWithSegments("/auth") || context.Request.Path.StartsWithSegments("/salon"))
+            if (IsProtectedApi(context.Request.Path))
             {
                 context.Response.Headers.CacheControl = "no-store";
                 if (!HttpMethods.IsGet(context.Request.Method) && !HttpMethods.IsHead(context.Request.Method))
@@ -97,13 +98,59 @@ public static class AuthenticationSetup
             var profile = await profiles.Read(UserId(context), ct);
             return profile is null ? Results.NotFound(new { error = "Salon setup required." }) : Results.Ok(profile);
         }).RequireAuthorization();
-        app.MapPost("/salon", (SalonInput input, HttpContext context, ISalonProfiles profiles, CancellationToken ct) => Save(input, context, profiles, true, ct)).RequireAuthorization();
-        app.MapPut("/salon", (SalonInput input, HttpContext context, ISalonProfiles profiles, CancellationToken ct) => Save(input, context, profiles, false, ct)).RequireAuthorization();
+        app.MapPost("/salon", (SalonInput input, HttpContext context, ISalonProfiles profiles, CancellationToken ct) => SaveSalon(input, context, profiles, true, ct)).RequireAuthorization();
+        app.MapPut("/salon", (SalonInput input, HttpContext context, ISalonProfiles profiles, CancellationToken ct) => SaveSalon(input, context, profiles, false, ct)).RequireAuthorization();
+        app.MapGet("/services", async (HttpContext context, IEmployeeDirectory employees, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await employees.Services(UserId(context), ct)); }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+        }).RequireAuthorization();
+        app.MapGet("/employees", async (HttpContext context, IEmployeeDirectory employees, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await employees.List(UserId(context), ct)); }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+        }).RequireAuthorization();
+        app.MapGet("/employees/{id:guid}", async (Guid id, HttpContext context, IEmployeeDirectory employees, CancellationToken ct) =>
+        {
+            try
+            {
+                var employee = await employees.Get(UserId(context), id, ct);
+                return employee is null ? Results.NotFound() : Results.Ok(employee);
+            }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+        }).RequireAuthorization();
+        app.MapPost("/employees", async (EmployeeInput input, HttpContext context, IEmployeeDirectory employees, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await employees.Create(UserId(context), input, ct)); }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+            catch (ArgumentException error) { return EmployeeValidation(error); }
+        }).RequireAuthorization();
+        app.MapPut("/employees/{id:guid}", async (Guid id, EmployeeInput input, HttpContext context, IEmployeeDirectory employees, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await employees.Update(UserId(context), id, input, ct)); }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+            catch (ArgumentException error) { return EmployeeValidation(error); }
+        }).RequireAuthorization();
+        app.MapDelete("/employees/{id:guid}", async (Guid id, HttpContext context, IEmployeeDirectory employees, CancellationToken ct) =>
+        {
+            try
+            {
+                await employees.Delete(UserId(context), id, ct);
+                return Results.NoContent();
+            }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+        }).RequireAuthorization();
     }
+
+    private static bool IsProtectedApi(PathString path) =>
+        path.StartsWithSegments("/auth") || path.StartsWithSegments("/salon") ||
+        path.StartsWithSegments("/employees") || path.StartsWithSegments("/services");
 
     private static Guid UserId(HttpContext context) => Guid.Parse(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-    private static async Task<IResult> Save(SalonInput input, HttpContext context, ISalonProfiles profiles, bool create, CancellationToken ct)
+    private static async Task<IResult> SaveSalon(SalonInput input, HttpContext context, ISalonProfiles profiles, bool create, CancellationToken ct)
     {
         try { return Results.Ok(await profiles.Save(UserId(context), input, create, ct)); }
         catch (UnauthorizedAccessException) { return Results.Forbid(); }
@@ -113,6 +160,17 @@ public static class AuthenticationSetup
             var field = error.ParamName switch { "name" => "name", "timeZoneId" => "timeZoneId", _ => "hours" };
             return Results.ValidationProblem(new Dictionary<string, string[]> { [field] = [error.Message] });
         }
+    }
+
+    private static IResult EmployeeValidation(ArgumentException error)
+    {
+        var field = error.ParamName switch
+        {
+            "name" => "name",
+            "serviceIds" or "ServiceIds" => "serviceIds",
+            _ => "hours",
+        };
+        return Results.ValidationProblem(new Dictionary<string, string[]> { [field] = [error.Message] });
     }
 
     public sealed record LoginInput(string Login, string Password);
