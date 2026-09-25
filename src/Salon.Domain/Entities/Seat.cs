@@ -14,4 +14,10 @@ public sealed class Seat
     public Guid SalonId { get; private set; }
     public string Name { get; private set; }
     public string Type { get; private set; }
+
+    public void UpdateProfile(string name, string type)
+    {
+        Name = DomainGuard.Text(name, nameof(name));
+        Type = DomainGuard.Text(type, nameof(type));
+    }
 }

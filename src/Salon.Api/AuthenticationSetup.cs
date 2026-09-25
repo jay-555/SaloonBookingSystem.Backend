@@ -49,6 +49,7 @@ public static class AuthenticationSetup
             protection.PersistKeysToFileSystem(new DirectoryInfo(path));
         builder.Services.AddScoped<ISalonProfiles, SalonProfiles>();
         builder.Services.AddScoped<IEmployeeDirectory, EmployeeDirectory>();
+        builder.Services.AddScoped<ISeatDirectory, SeatDirectory>();
         builder.Services.AddScoped<AccountProvisioner>();
     }
 
@@ -142,11 +143,49 @@ public static class AuthenticationSetup
             catch (UnauthorizedAccessException) { return Results.Forbid(); }
             catch (KeyNotFoundException) { return Results.NotFound(); }
         }).RequireAuthorization();
+        app.MapGet("/seats", async (HttpContext context, ISeatDirectory seats, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await seats.List(UserId(context), ct)); }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+        }).RequireAuthorization();
+        app.MapGet("/seats/{id:guid}", async (Guid id, HttpContext context, ISeatDirectory seats, CancellationToken ct) =>
+        {
+            try
+            {
+                var seat = await seats.Get(UserId(context), id, ct);
+                return seat is null ? Results.NotFound() : Results.Ok(seat);
+            }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+        }).RequireAuthorization();
+        app.MapPost("/seats", async (SeatInput input, HttpContext context, ISeatDirectory seats, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await seats.Create(UserId(context), input, ct)); }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+            catch (ArgumentException error) { return SeatValidation(error); }
+        }).RequireAuthorization();
+        app.MapPut("/seats/{id:guid}", async (Guid id, SeatInput input, HttpContext context, ISeatDirectory seats, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await seats.Update(UserId(context), id, input, ct)); }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+            catch (ArgumentException error) { return SeatValidation(error); }
+        }).RequireAuthorization();
+        app.MapDelete("/seats/{id:guid}", async (Guid id, HttpContext context, ISeatDirectory seats, CancellationToken ct) =>
+        {
+            try
+            {
+                await seats.Delete(UserId(context), id, ct);
+                return Results.NoContent();
+            }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+        }).RequireAuthorization();
     }
 
     private static bool IsProtectedApi(PathString path) =>
         path.StartsWithSegments("/auth") || path.StartsWithSegments("/salon") ||
-        path.StartsWithSegments("/employees") || path.StartsWithSegments("/services");
+        path.StartsWithSegments("/employees") || path.StartsWithSegments("/services") ||
+        path.StartsWithSegments("/seats");
 
     private static Guid UserId(HttpContext context) => Guid.Parse(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
@@ -169,6 +208,18 @@ public static class AuthenticationSetup
             "name" => "name",
             "serviceIds" or "ServiceIds" => "serviceIds",
             _ => "hours",
+        };
+        return Results.ValidationProblem(new Dictionary<string, string[]> { [field] = [error.Message] });
+    }
+
+    private static IResult SeatValidation(ArgumentException error)
+    {
+        var field = error.ParamName switch
+        {
+            "name" => "name",
+            "type" => "type",
+            "serviceIds" or "ServiceIds" => "serviceIds",
+            _ => "serviceIds",
         };
         return Results.ValidationProblem(new Dictionary<string, string[]> { [field] = [error.Message] });
     }

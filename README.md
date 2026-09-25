@@ -172,6 +172,21 @@ is allowed while no booking dependents exist. REST: `GET/POST /employees`,
 `GET/PUT/DELETE /employees/{id}`, and `GET /services` for skill selection.
 Admin UI lives at `/admin/employees` on the frontend.
 
+## Phase 4: seat management
+
+Apply the additive `SeatManagement` migration after Phase 3:
+
+```powershell
+dotnet ef database update --project src/Salon.Infrastructure
+```
+
+OwnerAdmin can create, update, and delete seats (chairs) for their salon,
+including supported services (same-salon services only, separate from employee
+skills). Manager can list and read. Hard delete is allowed while no booking
+dependents exist. REST: `GET/POST /seats`, `GET/PUT/DELETE /seats/{id}`, and
+`GET /services` for support-service selection. Admin UI lives at `/admin/seats`
+on the frontend.
+
 Browser sessions use Identity cookies with an eight-hour absolute lifetime and
 no remember-me or sliding renewal. Cookies are HttpOnly, host-only, SameSite=Lax,
 and Secure outside Development. Development over HTTP is for loopback local use
