@@ -53,8 +53,33 @@ public sealed class ServiceCatalog(SalonDbContext database) : IServiceCatalog
             || await database.SeatServices.AnyAsync(x => x.ServiceId == serviceId, cancellationToken);
         if (linked)
             throw new InvalidOperationException("Remove this service from employee skills and seat support lists before deleting it.");
+        await database.ServiceResourceRequirements.Where(x => x.ServiceId == serviceId).ExecuteDeleteAsync(cancellationToken);
         var deleted = await database.Services.Where(x => x.Id == serviceId && x.SalonId == salonId).ExecuteDeleteAsync(cancellationToken);
         if (deleted == 0) throw new KeyNotFoundException();
+    }
+
+    public async Task<ResourceRequirementDetail> SetRequirements(
+        Guid userId, Guid serviceId, ResourceRequirementInput input, CancellationToken cancellationToken)
+    {
+        var salonId = await RequireSalon(userId, write: true, cancellationToken);
+        var exists = await database.Services.AnyAsync(x => x.Id == serviceId && x.SalonId == salonId, cancellationToken);
+        if (!exists) throw new KeyNotFoundException();
+        var requirement = input.Validate(serviceId);
+        var existing = await database.ServiceResourceRequirements
+            .SingleOrDefaultAsync(x => x.ServiceId == serviceId, cancellationToken);
+        if (existing is null) database.ServiceResourceRequirements.Add(requirement);
+        else existing.Replace(input.SeatType, input.BufferMinutes, input.EmployeeCapacity);
+        await database.SaveChangesAsync(cancellationToken);
+        var saved = existing ?? requirement;
+        return new ResourceRequirementDetail(saved.EmployeeCapacity, saved.SeatType, saved.BufferMinutes);
+    }
+
+    public async Task ClearRequirements(Guid userId, Guid serviceId, CancellationToken cancellationToken)
+    {
+        var salonId = await RequireSalon(userId, write: true, cancellationToken);
+        var exists = await database.Services.AnyAsync(x => x.Id == serviceId && x.SalonId == salonId, cancellationToken);
+        if (!exists) throw new KeyNotFoundException();
+        await database.ServiceResourceRequirements.Where(x => x.ServiceId == serviceId).ExecuteDeleteAsync(cancellationToken);
     }
 
     private async Task<Guid> RequireSalon(Guid userId, bool write, CancellationToken cancellationToken)
@@ -76,8 +101,13 @@ public sealed class ServiceCatalog(SalonDbContext database) : IServiceCatalog
     {
         var service = await database.Services.AsNoTracking()
             .SingleOrDefaultAsync(x => x.Id == serviceId && x.SalonId == salonId, cancellationToken);
-        return service is null
-            ? null
-            : new ServiceDetail(service.Id, service.Name, service.Category, service.Price, service.DurationMinutes);
+        if (service is null) return null;
+        var requirement = await database.ServiceResourceRequirements.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.ServiceId == serviceId, cancellationToken);
+        return new ServiceDetail(
+            service.Id, service.Name, service.Category, service.Price, service.DurationMinutes,
+            requirement is null
+                ? null
+                : new ResourceRequirementDetail(requirement.EmployeeCapacity, requirement.SeatType, requirement.BufferMinutes));
     }
 }

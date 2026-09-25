@@ -16,6 +16,7 @@ public sealed class SalonDbContext(DbContextOptions<SalonDbContext> options) : I
     public DbSet<EmployeeWorkingDay> EmployeeWorkingDays => Set<EmployeeWorkingDay>();
     public DbSet<EmployeeBreak> EmployeeBreaks => Set<EmployeeBreak>();
     public DbSet<SeatService> SeatServices => Set<SeatService>();
+    public DbSet<ServiceResourceRequirement> ServiceResourceRequirements => Set<ServiceResourceRequirement>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -64,6 +65,15 @@ public sealed class SalonDbContext(DbContextOptions<SalonDbContext> options) : I
             link.HasOne<Seat>().WithMany().HasForeignKey(x => x.SeatId).OnDelete(DeleteBehavior.Cascade);
             link.HasOne<Service>().WithMany().HasForeignKey(x => x.ServiceId).OnDelete(DeleteBehavior.Restrict);
             link.ToTable("SeatServices");
+        });
+        modelBuilder.Entity<ServiceResourceRequirement>(requirement =>
+        {
+            requirement.HasKey(x => x.ServiceId);
+            requirement.Property(x => x.SeatType).IsRequired();
+            requirement.HasOne<Service>().WithMany().HasForeignKey(x => x.ServiceId).OnDelete(DeleteBehavior.Cascade);
+            requirement.ToTable("ServiceResourceRequirements", table => table.HasCheckConstraint(
+                "CK_ServiceResourceRequirements_Rules",
+                "\"EmployeeCapacity\" = 1 AND btrim(\"SeatType\", U&'\\0009\\000A\\000B\\000C\\000D\\0020\\0085\\00A0\\1680\\2000\\2001\\2002\\2003\\2004\\2005\\2006\\2007\\2008\\2009\\200A\\2028\\2029\\202F\\205F\\3000') <> '' AND \"BufferMinutes\" >= 0"));
         });
     }
 }
