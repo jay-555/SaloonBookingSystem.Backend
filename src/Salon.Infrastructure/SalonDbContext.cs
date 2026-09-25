@@ -15,6 +15,7 @@ public sealed class SalonDbContext(DbContextOptions<SalonDbContext> options) : I
     public DbSet<EmployeeSkill> EmployeeSkills => Set<EmployeeSkill>();
     public DbSet<EmployeeWorkingDay> EmployeeWorkingDays => Set<EmployeeWorkingDay>();
     public DbSet<EmployeeBreak> EmployeeBreaks => Set<EmployeeBreak>();
+    public DbSet<SeatService> SeatServices => Set<SeatService>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -56,6 +57,13 @@ public sealed class SalonDbContext(DbContextOptions<SalonDbContext> options) : I
             item.HasIndex(x => x.EmployeeId);
             item.ToTable("EmployeeBreaks", table => table.HasCheckConstraint("CK_EmployeeBreaks_Interval",
                 "\"Day\" BETWEEN 0 AND 6 AND \"StartsAt\" >= 0 AND \"EndsAt\" <= 1439 AND \"StartsAt\" < \"EndsAt\""));
+        });
+        modelBuilder.Entity<SeatService>(link =>
+        {
+            link.HasKey(x => new { x.SeatId, x.ServiceId });
+            link.HasOne<Seat>().WithMany().HasForeignKey(x => x.SeatId).OnDelete(DeleteBehavior.Cascade);
+            link.HasOne<Service>().WithMany().HasForeignKey(x => x.ServiceId).OnDelete(DeleteBehavior.Restrict);
+            link.ToTable("SeatServices");
         });
     }
 }
