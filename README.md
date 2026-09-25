@@ -187,6 +187,21 @@ dependents exist. REST: `GET/POST /seats`, `GET/PUT/DELETE /seats/{id}`, and
 `GET /services` for support-service selection. Admin UI lives at `/admin/seats`
 on the frontend.
 
+## Phase 5: service catalog
+
+No new migration is required beyond Phase 4 — the Phase 1 `Services` table is
+reused. Explicit `database update` remains the supported apply path:
+
+```powershell
+dotnet ef database update --project src/Salon.Infrastructure
+```
+
+OwnerAdmin can create, update, and delete services (name, category, INR price,
+duration minutes). Manager can list and read. Hard delete is blocked while
+employee skills or seat support links still reference the service (HTTP 409).
+REST: `GET/POST /services`, `GET/PUT/DELETE /services/{id}`. Admin UI lives at
+`/admin/services` on the frontend.
+
 Browser sessions use Identity cookies with an eight-hour absolute lifetime and
 no remember-me or sliding renewal. Cookies are HttpOnly, host-only, SameSite=Lax,
 and Secure outside Development. Development over HTTP is for loopback local use

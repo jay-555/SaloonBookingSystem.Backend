@@ -47,7 +47,6 @@ public sealed record EmployeeInput(string Name, Guid[] ServiceIds, EmployeeDayIn
 
 public sealed record EmployeeSummary(Guid Id, string Name);
 public sealed record EmployeeDetail(Guid Id, string Name, Guid[] ServiceIds, EmployeeDayInput[] Hours);
-public sealed record ServiceSummary(Guid Id, string Name, string Category);
 
 public interface IEmployeeDirectory
 {
@@ -56,5 +55,4 @@ public interface IEmployeeDirectory
     Task<EmployeeDetail> Create(Guid userId, EmployeeInput input, CancellationToken cancellationToken);
     Task<EmployeeDetail> Update(Guid userId, Guid employeeId, EmployeeInput input, CancellationToken cancellationToken);
     Task Delete(Guid userId, Guid employeeId, CancellationToken cancellationToken);
-    Task<IReadOnlyList<ServiceSummary>> Services(Guid userId, CancellationToken cancellationToken);
 }

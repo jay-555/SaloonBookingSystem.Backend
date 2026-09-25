@@ -26,4 +26,20 @@ public sealed class Service
     public string Category { get; private set; }
     public decimal Price { get; private set; }
     public int DurationMinutes { get; private set; }
+
+    public void UpdateProfile(string name, string category, decimal price, int durationMinutes)
+    {
+        Name = DomainGuard.Text(name, nameof(name));
+        Category = DomainGuard.Text(category, nameof(category));
+        if (price < 0 || decimal.Round(price, 2) != price)
+        {
+            throw new ArgumentOutOfRangeException(nameof(price), "INR price must be non-negative with at most two fractional digits.");
+        }
+        if (durationMinutes <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(durationMinutes), "Duration must be a positive whole number of minutes.");
+        }
+        Price = price;
+        DurationMinutes = durationMinutes;
+    }
 }
