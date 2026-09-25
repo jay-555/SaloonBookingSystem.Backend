@@ -290,6 +290,20 @@ Returns salon-local booking items (service · employee labels). Employee
 Identity accounts receive 403. Admin UI: `/admin/seats/calendar`. Reuses Phase 9
 schedule assembly; seats have no breaks/leave.
 
+## Phase 11: walk-in booking
+
+No new migration. OwnerAdmin and Manager create reception bookings for their
+membership salon using the Phase 7 engine (same path as public create):
+
+| API | Behavior |
+|---|---|
+| GET `/services/{id}/employees` | Skilled employees for a bookable service |
+| POST `/bookings` | Walk-in create + customer; CSRF; 409 if slot taken |
+
+Uses staff `/availability` for slot browsing. Employee role receives 403.
+Admin UI: `/admin/walk-in`. A walk-in occupies the same employee/seat window a
+website booking would.
+
 Browser sessions use Identity cookies with an eight-hour absolute lifetime and
 no remember-me or sliding renewal. Cookies are HttpOnly, host-only, SameSite=Lax,
 and Secure outside Development. Development over HTTP is for loopback local use

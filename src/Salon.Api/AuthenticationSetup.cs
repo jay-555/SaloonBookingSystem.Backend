@@ -53,6 +53,7 @@ public static class AuthenticationSetup
         builder.Services.AddScoped<IServiceCatalog, ServiceCatalog>();
         builder.Services.AddScoped<IAvailabilityService, AvailabilityService>();
         builder.Services.AddScoped<IPublicBooking, PublicBookingService>();
+        builder.Services.AddScoped<IWalkInBooking, WalkInBookingService>();
         builder.Services.AddScoped<IEmployeeSchedule, EmployeeScheduleService>();
         builder.Services.AddScoped<ISeatSchedule, SeatScheduleService>();
         builder.Services.AddScoped<AccountProvisioner>();
@@ -224,6 +225,20 @@ public static class AuthenticationSetup
             catch (InvalidOperationException error) { return Results.Json(new { error = error.Message }, statusCode: 503); }
             catch (ArgumentException error) { return PublicBookingValidation(error); }
         });
+        app.MapGet("/services/{serviceId:guid}/employees", async (Guid serviceId, HttpContext context, IWalkInBooking walkIn, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await walkIn.Employees(UserId(context), serviceId, ct)); }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+        }).RequireAuthorization();
+        app.MapPost("/bookings", async (CreatePublicBookingInput input, HttpContext context, IWalkInBooking walkIn, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await walkIn.Create(UserId(context), input, ct)); }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+            catch (SlotUnavailableException error) { return Results.Conflict(new { error = error.Message }); }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+            catch (ArgumentException error) { return PublicBookingValidation(error); }
+        }).RequireAuthorization();
         app.MapGet("/employees/{id:guid}/schedule", async (Guid id, DateOnly date, string view, HttpContext context, IEmployeeSchedule schedules, CancellationToken ct) =>
         {
             try
@@ -338,7 +353,7 @@ public static class AuthenticationSetup
         path.StartsWithSegments("/auth") || path.StartsWithSegments("/salon") ||
         path.StartsWithSegments("/employees") || path.StartsWithSegments("/services") ||
         path.StartsWithSegments("/seats") || path.StartsWithSegments("/availability") ||
-        path.StartsWithSegments("/public");
+        path.StartsWithSegments("/public") || path.StartsWithSegments("/bookings");
 
     private static IResult PublicBookingValidation(ArgumentException error)
     {
