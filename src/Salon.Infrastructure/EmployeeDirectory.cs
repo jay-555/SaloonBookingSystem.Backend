@@ -65,16 +65,6 @@ public sealed class EmployeeDirectory(SalonDbContext database) : IEmployeeDirect
         if (deleted == 0) throw new KeyNotFoundException();
     }
 
-    public async Task<IReadOnlyList<ServiceSummary>> Services(Guid userId, CancellationToken cancellationToken)
-    {
-        var salonId = await RequireSalon(userId, write: false, cancellationToken);
-        return await database.Services.AsNoTracking()
-            .Where(x => x.SalonId == salonId)
-            .OrderBy(x => x.Name)
-            .Select(x => new ServiceSummary(x.Id, x.Name, x.Category))
-            .ToListAsync(cancellationToken);
-    }
-
     private async Task<Guid> RequireSalon(Guid userId, bool write, CancellationToken cancellationToken)
     {
         var account = await database.Users.AsNoTracking()

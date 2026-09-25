@@ -50,6 +50,7 @@ public static class AuthenticationSetup
         builder.Services.AddScoped<ISalonProfiles, SalonProfiles>();
         builder.Services.AddScoped<IEmployeeDirectory, EmployeeDirectory>();
         builder.Services.AddScoped<ISeatDirectory, SeatDirectory>();
+        builder.Services.AddScoped<IServiceCatalog, ServiceCatalog>();
         builder.Services.AddScoped<AccountProvisioner>();
     }
 
@@ -101,10 +102,45 @@ public static class AuthenticationSetup
         }).RequireAuthorization();
         app.MapPost("/salon", (SalonInput input, HttpContext context, ISalonProfiles profiles, CancellationToken ct) => SaveSalon(input, context, profiles, true, ct)).RequireAuthorization();
         app.MapPut("/salon", (SalonInput input, HttpContext context, ISalonProfiles profiles, CancellationToken ct) => SaveSalon(input, context, profiles, false, ct)).RequireAuthorization();
-        app.MapGet("/services", async (HttpContext context, IEmployeeDirectory employees, CancellationToken ct) =>
+        app.MapGet("/services", async (HttpContext context, IServiceCatalog services, CancellationToken ct) =>
         {
-            try { return Results.Ok(await employees.Services(UserId(context), ct)); }
+            try { return Results.Ok(await services.List(UserId(context), ct)); }
             catch (UnauthorizedAccessException) { return Results.Forbid(); }
+        }).RequireAuthorization();
+        app.MapGet("/services/{id:guid}", async (Guid id, HttpContext context, IServiceCatalog services, CancellationToken ct) =>
+        {
+            try
+            {
+                var service = await services.Get(UserId(context), id, ct);
+                return service is null ? Results.NotFound() : Results.Ok(service);
+            }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+        }).RequireAuthorization();
+        app.MapPost("/services", async (ServiceInput input, HttpContext context, IServiceCatalog services, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await services.Create(UserId(context), input, ct)); }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+            catch (ArgumentOutOfRangeException error) { return ServiceValidation(error); }
+            catch (ArgumentException error) { return ServiceValidation(error); }
+        }).RequireAuthorization();
+        app.MapPut("/services/{id:guid}", async (Guid id, ServiceInput input, HttpContext context, IServiceCatalog services, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await services.Update(UserId(context), id, input, ct)); }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+            catch (ArgumentOutOfRangeException error) { return ServiceValidation(error); }
+            catch (ArgumentException error) { return ServiceValidation(error); }
+        }).RequireAuthorization();
+        app.MapDelete("/services/{id:guid}", async (Guid id, HttpContext context, IServiceCatalog services, CancellationToken ct) =>
+        {
+            try
+            {
+                await services.Delete(UserId(context), id, ct);
+                return Results.NoContent();
+            }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+            catch (InvalidOperationException error) { return Results.Conflict(new { error = error.Message }); }
         }).RequireAuthorization();
         app.MapGet("/employees", async (HttpContext context, IEmployeeDirectory employees, CancellationToken ct) =>
         {
@@ -220,6 +256,19 @@ public static class AuthenticationSetup
             "type" => "type",
             "serviceIds" or "ServiceIds" => "serviceIds",
             _ => "serviceIds",
+        };
+        return Results.ValidationProblem(new Dictionary<string, string[]> { [field] = [error.Message] });
+    }
+
+    private static IResult ServiceValidation(ArgumentException error)
+    {
+        var field = error.ParamName switch
+        {
+            "name" => "name",
+            "category" => "category",
+            "price" => "price",
+            "durationMinutes" => "durationMinutes",
+            _ => "name",
         };
         return Results.ValidationProblem(new Dictionary<string, string[]> { [field] = [error.Message] });
     }
