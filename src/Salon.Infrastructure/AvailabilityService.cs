@@ -8,7 +8,12 @@ public sealed class AvailabilityService(SalonDbContext database) : IAvailability
 {
     public async Task<AvailabilityResult> Query(Guid userId, AvailabilityQuery query, CancellationToken cancellationToken)
     {
-        var salonId = await RequireSalon(userId, cancellationToken);
+        var salonId = await RequireStaffSalon(userId, cancellationToken);
+        return await QueryForSalon(salonId, query, cancellationToken);
+    }
+
+    public async Task<AvailabilityResult> QueryForSalon(Guid salonId, AvailabilityQuery query, CancellationToken cancellationToken)
+    {
         var service = await database.Services.AsNoTracking()
             .SingleOrDefaultAsync(x => x.Id == query.ServiceId && x.SalonId == salonId, cancellationToken)
             ?? throw new KeyNotFoundException("Service was not found.");
@@ -99,7 +104,7 @@ public sealed class AvailabilityService(SalonDbContext database) : IAvailability
             slots.Select(x => new AvailableSlot(x.StartsAtLocal, x.StartsAtUtc, x.EmployeeId, x.SeatId)).ToArray());
     }
 
-    private async Task<Guid> RequireSalon(Guid userId, CancellationToken cancellationToken)
+    private async Task<Guid> RequireStaffSalon(Guid userId, CancellationToken cancellationToken)
     {
         var account = await database.Users.AsNoTracking()
             .Where(x => x.Id == userId)

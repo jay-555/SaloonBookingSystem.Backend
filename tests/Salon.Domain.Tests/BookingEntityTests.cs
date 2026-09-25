@@ -12,8 +12,12 @@ public sealed class BookingEntityTests
         var end = start.AddHours(1);
         var booking = new Booking(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), start, end);
         Assert.Equal(start, booking.StartsAtUtc);
+        Assert.Null(booking.CustomerId);
+        var withCustomer = new Booking(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), start, end, Guid.NewGuid());
+        Assert.NotNull(withCustomer.CustomerId);
         Assert.Throws<ArgumentException>(() => new Booking(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), end, start));
         Assert.Throws<ArgumentException>(() => new Booking(Guid.Empty, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), start, end));
+        Assert.Throws<ArgumentException>(() => new Booking(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), start, end, Guid.Empty));
         Assert.Throws<ArgumentException>(() => new EmployeeLeave(Guid.NewGuid(), Guid.NewGuid(), end, start));
     }
 }
