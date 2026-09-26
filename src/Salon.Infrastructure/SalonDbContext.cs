@@ -135,6 +135,7 @@ public sealed class SalonDbContext(DbContextOptions<SalonDbContext> options) : I
             customer.Property(x => x.Name).IsRequired();
             customer.Property(x => x.Phone).IsRequired();
             customer.HasIndex(x => x.SalonId);
+            customer.HasIndex(x => new { x.SalonId, x.Phone });
             customer.HasOne<SalonEntity>().WithMany().HasForeignKey(x => x.SalonId).OnDelete(DeleteBehavior.Restrict);
             customer.ToTable("Customers", table =>
             {

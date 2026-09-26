@@ -55,6 +55,7 @@ public static class AuthenticationSetup
         builder.Services.AddScoped<IPublicBooking, PublicBookingService>();
         builder.Services.AddScoped<IWalkInBooking, WalkInBookingService>();
         builder.Services.AddScoped<IBookingModification, BookingModificationService>();
+        builder.Services.AddScoped<ICustomerCrm, CustomerCrmService>();
         builder.Services.AddScoped<IEmployeeSchedule, EmployeeScheduleService>();
         builder.Services.AddScoped<ISeatSchedule, SeatScheduleService>();
         builder.Services.AddScoped<AccountProvisioner>();
@@ -274,6 +275,21 @@ public static class AuthenticationSetup
             catch (InvalidOperationException error) { return Results.Conflict(new { error = error.Message }); }
             catch (ArgumentException error) { return PublicBookingValidation(error); }
         }).RequireAuthorization();
+        app.MapGet("/customers", async (string? q, HttpContext context, ICustomerCrm crm, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await crm.Search(UserId(context), q, ct)); }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+        }).RequireAuthorization();
+        app.MapGet("/customers/{id:guid}", async (Guid id, HttpContext context, ICustomerCrm crm, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await crm.Get(UserId(context), id, ct)); }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+            catch (TimeZoneNotFoundException)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["customer"] = ["Salon time zone is invalid."] });
+            }
+        }).RequireAuthorization();
         app.MapGet("/employees/{id:guid}/schedule", async (Guid id, DateOnly date, string view, HttpContext context, IEmployeeSchedule schedules, CancellationToken ct) =>
         {
             try
@@ -388,7 +404,8 @@ public static class AuthenticationSetup
         path.StartsWithSegments("/auth") || path.StartsWithSegments("/salon") ||
         path.StartsWithSegments("/employees") || path.StartsWithSegments("/services") ||
         path.StartsWithSegments("/seats") || path.StartsWithSegments("/availability") ||
-        path.StartsWithSegments("/public") || path.StartsWithSegments("/bookings");
+        path.StartsWithSegments("/public") || path.StartsWithSegments("/bookings") ||
+        path.StartsWithSegments("/customers");
 
     private static IResult PublicBookingValidation(ArgumentException error)
     {
