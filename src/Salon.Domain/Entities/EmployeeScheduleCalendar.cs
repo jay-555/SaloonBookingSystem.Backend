@@ -21,7 +21,7 @@ public static class EmployeeScheduleCalendar
         return (start, start.AddDays(7));
     }
 
-    public sealed record BookingSlice(Guid Id, DateTimeOffset StartsAtUtc, DateTimeOffset EndsAtUtc, string ServiceName, string? SeatName);
+    public sealed record BookingSlice(Guid Id, DateTimeOffset StartsAtUtc, DateTimeOffset EndsAtUtc, string ServiceName, string? SeatName, string? Status = null);
     public sealed record LeaveSlice(Guid Id, DateTimeOffset StartsAtUtc, DateTimeOffset EndsAtUtc);
     public sealed record BreakSlice(int DayOfWeek, int StartsAtMinutes, int EndsAtMinutes);
     public sealed record TimelineItem(
@@ -31,7 +31,8 @@ public static class EmployeeScheduleCalendar
         string EndsAtLocal,
         string Label,
         Guid? SourceId,
-        string? SeatName);
+        string? SeatName,
+        string? Status = null);
 
     public static IReadOnlyList<TimelineItem> Assemble(
         string timeZoneId,
@@ -53,7 +54,7 @@ public static class EmployeeScheduleCalendar
             foreach (var booking in bookings.Where(x => x.StartsAtUtc < dayEndUtc && x.EndsAtUtc > dayStartUtc))
             {
                 var (start, end) = ClipLocal(booking.StartsAtUtc, booking.EndsAtUtc, dayStartUtc, dayEndUtc, zone);
-                items.Add(new TimelineItem("booking", day, Format(start), Format(end), booking.ServiceName, booking.Id, booking.SeatName));
+                items.Add(new TimelineItem("booking", day, Format(start), Format(end), booking.ServiceName, booking.Id, booking.SeatName, booking.Status));
             }
 
             foreach (var leave in leaves.Where(x => x.StartsAtUtc < dayEndUtc && x.EndsAtUtc > dayStartUtc))

@@ -321,6 +321,31 @@ checks):
 Staff `/availability` accepts optional `excludeBookingId`. Calendars omit
 cancelled bookings. Admin UI: `/admin/bookings/{id}` (linked from calendars).
 
+## Phase 13: booking status lifecycle
+
+Additive migration `BookingStatusLifecycle` adds `Bookings.Status` (backfill
+`Confirmed`), extends `BookingAudits` with `FromStatus`/`ToStatus` and
+`StatusChange` operations, and keeps partial GiST cancel semantics. New
+public and walk-in bookings start as `Confirmed`. OwnerAdmin and Manager may
+advance status within their salon:
+
+| Status | Allowed next |
+|---|---|
+| Pending | Confirmed, Cancelled |
+| Confirmed | CheckedIn, Cancelled, NoShow |
+| CheckedIn | InService, Cancelled, NoShow |
+| InService | Completed, Cancelled, NoShow |
+| Completed / Cancelled / NoShow | (terminal) |
+
+| API | Behavior |
+|---|---|
+| GET `/bookings/{id}` | Detail includes `status` and `allowedNextStatuses` |
+| POST `/bookings/{id}/status` | `{ status }`; CSRF; 409 on illegal transition; Cancelled frees slot |
+| POST `/bookings/{id}/cancel` | Same soft-cancel path as status → Cancelled |
+
+Employee and seat schedule items expose `status` on booking rows. Employee
+Identity role receives 403 for status changes.
+
 Browser sessions use Identity cookies with an eight-hour absolute lifetime and
 no remember-me or sliding renewal. Cookies are HttpOnly, host-only, SameSite=Lax,
 and Secure outside Development. Development over HTTP is for loopback local use

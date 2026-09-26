@@ -12,13 +12,13 @@ using Xunit;
 namespace Salon.Api.Tests;
 
 [Trait("Category", "Container")]
-public sealed class BookingModificationApiTests
+public sealed class BookingStatusLifecycleApiTests
 {
     private const string Password = "Test-only!Password42";
     private static readonly DateOnly Monday = new(2026, 9, 28);
 
     [Fact]
-    public async Task Staff_reschedule_cancel_conflict_and_authorization()
+    public async Task Staff_advances_status_rejects_illegal_moves_and_cancel_frees_slot()
     {
         await using var db = new TestDatabase(); await db.StartAsync();
         await using var factory = Factory(db.GetConnectionString());
@@ -44,45 +44,65 @@ public sealed class BookingModificationApiTests
             context.EmployeeWorkingDays.Add(new EmployeeWorkingDay(employeeId, (int)DayOfWeek.Monday, 9 * 60, 18 * 60));
             context.Seats.Add(new Seat(seatId, salon.Id, "Chair 1", "Chair"));
             context.SeatServices.Add(new SeatService(seatId, serviceId));
-            var start = new DateTimeOffset(2026, 9, 28, 4, 30, 0, TimeSpan.Zero); // 10:00 IST
+            var start = new DateTimeOffset(2026, 9, 28, 4, 30, 0, TimeSpan.Zero);
             context.Bookings.Add(new Booking(bookingId, salon.Id, serviceId, employeeId, seatId, start, start.AddHours(1)));
             await context.SaveChangesAsync();
         }
 
         var detail = await owner.GetFromJsonAsync<StaffBookingDetail>($"/bookings/{bookingId}");
-        Assert.Equal("Haircut", detail!.ServiceName);
-        Assert.False(detail.Cancelled);
-        Assert.Equal(BookingStatuses.Confirmed, detail.Status);
+        Assert.Equal(BookingStatuses.Confirmed, detail!.Status);
         Assert.Contains(BookingStatuses.CheckedIn, detail.AllowedNextStatuses);
 
-        var moved = await (await Send(owner, $"/bookings/{bookingId}",
-            new RescheduleBookingInput(Monday, "11:00", employeeId), HttpMethod.Put))
-            .Content.ReadFromJsonAsync<StaffBookingDetail>();
-        Assert.Equal("11:00", moved!.StartsAtLocal);
+        var checkedIn = await (await Send(owner, $"/bookings/{bookingId}/status",
+            new TransitionBookingInput(BookingStatuses.CheckedIn))).Content.ReadFromJsonAsync<StaffBookingDetail>();
+        Assert.Equal(BookingStatuses.CheckedIn, checkedIn!.Status);
 
-        // Old 10:00 slot is free for a new walk-in.
+        var illegal = await Send(owner, $"/bookings/{bookingId}/status",
+            new TransitionBookingInput(BookingStatuses.Completed));
+        Assert.Equal(HttpStatusCode.Conflict, illegal.StatusCode);
+
+        var inService = await (await Send(owner, $"/bookings/{bookingId}/status",
+            new TransitionBookingInput(BookingStatuses.InService))).Content.ReadFromJsonAsync<StaffBookingDetail>();
+        Assert.Equal(BookingStatuses.InService, inService!.Status);
+
+        var completed = await (await Send(owner, $"/bookings/{bookingId}/status",
+            new TransitionBookingInput(BookingStatuses.Completed))).Content.ReadFromJsonAsync<StaffBookingDetail>();
+        Assert.Equal(BookingStatuses.Completed, completed!.Status);
+        Assert.Empty(completed.AllowedNextStatuses);
+
+        // Fresh booking for cancel → frees slot for walk-in.
+        Guid cancelId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<SalonDbContext>();
+            cancelId = Guid.NewGuid();
+            var start = new DateTimeOffset(2026, 9, 28, 5, 30, 0, TimeSpan.Zero); // 11:00 IST
+            context.Bookings.Add(new Booking(cancelId, salon.Id, serviceId, employeeId, seatId, start, start.AddHours(1)));
+            await context.SaveChangesAsync();
+        }
+
+        var cancelled = await (await Send(owner, $"/bookings/{cancelId}/status",
+            new TransitionBookingInput(BookingStatuses.Cancelled))).Content.ReadFromJsonAsync<StaffBookingDetail>();
+        Assert.Equal(BookingStatuses.Cancelled, cancelled!.Status);
+        Assert.True(cancelled.Cancelled);
+
         Assert.Equal(HttpStatusCode.OK, (await Send(owner, "/bookings",
-            new CreatePublicBookingInput(serviceId, Monday, "10:00", null, "Walk In", "9876543210", null))).StatusCode);
+            new CreatePublicBookingInput(serviceId, Monday, "11:00", null, "Walk In", "9876543210", null))).StatusCode);
 
-        // Conflict when targeting an occupied slot.
-        var conflict = await Send(owner, $"/bookings/{bookingId}",
-            new RescheduleBookingInput(Monday, "10:00", null), HttpMethod.Put);
-        Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
-
-        Assert.Equal(HttpStatusCode.NoContent, (await Send(owner, $"/bookings/{bookingId}/cancel", new { })).StatusCode);
-        Assert.Equal(1, await CountActiveBookings(factory));
-        Assert.True(await CountAudits(factory) >= 2);
+        Assert.True(await CountStatusAudits(factory) >= 4);
 
         await Provision(factory, "staff", "Employee", salon.Id);
         using var staff = Client(factory); await Login(staff, "staff");
-        Assert.Equal(HttpStatusCode.Forbidden, (await Send(staff, $"/bookings/{bookingId}/cancel", new { })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Send(staff, $"/bookings/{bookingId}/status",
+            new TransitionBookingInput(BookingStatuses.CheckedIn))).StatusCode);
 
         using var anon = Client(factory);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await Send(anon, $"/bookings/{bookingId}/cancel", new { })).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await Send(anon, $"/bookings/{bookingId}/status",
+            new TransitionBookingInput(BookingStatuses.CheckedIn))).StatusCode);
     }
 
     [Fact]
-    public async Task Modification_stays_inside_membership_salon()
+    public async Task Status_transition_stays_inside_membership_salon()
     {
         await using var db = new TestDatabase(); await db.StartAsync();
         await using var factory = Factory(db.GetConnectionString());
@@ -117,20 +137,16 @@ public sealed class BookingModificationApiTests
             await context.SaveChangesAsync();
         }
 
-        Assert.Equal(HttpStatusCode.NotFound, (await ownerA.GetAsync($"/bookings/{bookingB}")).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await Send(ownerA, $"/bookings/{bookingB}/cancel", new { })).StatusCode);
+        _ = salonA;
+        Assert.Equal(HttpStatusCode.NotFound, (await Send(ownerA, $"/bookings/{bookingB}/status",
+            new TransitionBookingInput(BookingStatuses.CheckedIn))).StatusCode);
     }
 
-    private static async Task<int> CountActiveBookings(WebApplicationFactory<Program> factory)
+    private static async Task<int> CountStatusAudits(WebApplicationFactory<Program> factory)
     {
         using var scope = factory.Services.CreateScope();
-        return await scope.ServiceProvider.GetRequiredService<SalonDbContext>().Bookings.CountAsync(x => x.CancelledAtUtc == null);
-    }
-
-    private static async Task<int> CountAudits(WebApplicationFactory<Program> factory)
-    {
-        using var scope = factory.Services.CreateScope();
-        return await scope.ServiceProvider.GetRequiredService<SalonDbContext>().BookingAudits.CountAsync();
+        return await scope.ServiceProvider.GetRequiredService<SalonDbContext>().BookingAudits
+            .CountAsync(x => x.Operation == BookingAuditOperations.StatusChange || x.Operation == BookingAuditOperations.Cancel);
     }
 
     private static WebApplicationFactory<Program> Factory(string connection) =>
