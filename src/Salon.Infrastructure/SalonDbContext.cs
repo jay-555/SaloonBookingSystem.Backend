@@ -85,6 +85,7 @@ public sealed class SalonDbContext(DbContextOptions<SalonDbContext> options) : I
             booking.Property(x => x.Id).ValueGeneratedNever();
             booking.Property(x => x.StartsAtUtc).IsRequired();
             booking.Property(x => x.EndsAtUtc).IsRequired();
+            booking.Property(x => x.Status).IsRequired();
             booking.HasIndex(x => x.SalonId);
             booking.HasIndex(x => x.EmployeeId);
             booking.HasIndex(x => x.SeatId);
@@ -93,8 +94,13 @@ public sealed class SalonDbContext(DbContextOptions<SalonDbContext> options) : I
             booking.HasOne<Employee>().WithMany().HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Restrict);
             booking.HasOne<Seat>().WithMany().HasForeignKey(x => x.SeatId).OnDelete(DeleteBehavior.Restrict);
             booking.HasOne<Customer>().WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
-            booking.ToTable("Bookings", table => table.HasCheckConstraint("CK_Bookings_Range",
-                "\"Id\" <> '00000000-0000-0000-0000-000000000000'::uuid AND \"EndsAtUtc\" > \"StartsAtUtc\""));
+            booking.ToTable("Bookings", table =>
+            {
+                table.HasCheckConstraint("CK_Bookings_Range",
+                    "\"Id\" <> '00000000-0000-0000-0000-000000000000'::uuid AND \"EndsAtUtc\" > \"StartsAtUtc\"");
+                table.HasCheckConstraint("CK_Bookings_Status",
+                    "\"Status\" IN ('Pending','Confirmed','CheckedIn','InService','Completed','Cancelled','NoShow')");
+            });
         });
         modelBuilder.Entity<BookingAudit>(audit =>
         {
@@ -108,7 +114,7 @@ public sealed class SalonDbContext(DbContextOptions<SalonDbContext> options) : I
             audit.ToTable("BookingAudits", table =>
             {
                 table.HasCheckConstraint("CK_BookingAudits_Id", "\"Id\" <> '00000000-0000-0000-0000-000000000000'::uuid");
-                table.HasCheckConstraint("CK_BookingAudits_Operation", "\"Operation\" IN ('Reschedule','Cancel')");
+                table.HasCheckConstraint("CK_BookingAudits_Operation", "\"Operation\" IN ('Reschedule','Cancel','StatusChange')");
             });
         });
         modelBuilder.Entity<EmployeeLeave>(leave =>

@@ -52,7 +52,8 @@ public sealed class BookingModificationService(SalonDbContext database, IAvailab
                 Guid.NewGuid(), booking.Id, salonId, userId, DateTimeOffset.UtcNow,
                 BookingAuditOperations.Reschedule,
                 fromStart, fromEnd, fromEmployee, fromSeat,
-                match.StartsAtUtc, endUtc, match.EmployeeId, match.SeatId));
+                match.StartsAtUtc, endUtc, match.EmployeeId, match.SeatId,
+                booking.Status, booking.Status));
 
             await database.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
@@ -66,27 +67,48 @@ public sealed class BookingModificationService(SalonDbContext database, IAvailab
 
     public async Task Cancel(Guid userId, Guid bookingId, CancellationToken cancellationToken)
     {
+        await Transition(userId, bookingId, new TransitionBookingInput(BookingStatuses.Cancelled), cancellationToken);
+    }
+
+    public async Task<StaffBookingDetail> Transition(Guid userId, Guid bookingId, TransitionBookingInput input, CancellationToken cancellationToken)
+    {
         var salonId = await RequireStaffSalon(userId, cancellationToken);
         await using var transaction = await database.Database.BeginTransactionAsync(cancellationToken);
         var booking = await database.Bookings
             .SingleOrDefaultAsync(x => x.Id == bookingId && x.SalonId == salonId, cancellationToken)
             ?? throw new KeyNotFoundException("Booking was not found.");
-        if (!booking.IsActive)
-            throw new InvalidOperationException("Booking is already cancelled.");
 
+        var fromStatus = booking.Status;
         var fromStart = booking.StartsAtUtc;
         var fromEnd = booking.EndsAtUtc;
         var fromEmployee = booking.EmployeeId;
         var fromSeat = booking.SeatId;
         var at = DateTimeOffset.UtcNow;
-        booking.Cancel(at);
+        try
+        {
+            booking.TransitionTo(input.Status, at);
+        }
+        catch (InvalidOperationException)
+        {
+            throw;
+        }
+
+        var operation = input.Status == BookingStatuses.Cancelled && fromStatus != BookingStatuses.Cancelled
+            ? BookingAuditOperations.Cancel
+            : BookingAuditOperations.StatusChange;
         database.BookingAudits.Add(new BookingAudit(
             Guid.NewGuid(), booking.Id, salonId, userId, at,
-            BookingAuditOperations.Cancel,
+            operation,
             fromStart, fromEnd, fromEmployee, fromSeat,
-            null, null, null, null));
+            operation == BookingAuditOperations.Cancel ? null : fromStart,
+            operation == BookingAuditOperations.Cancel ? null : fromEnd,
+            operation == BookingAuditOperations.Cancel ? null : fromEmployee,
+            operation == BookingAuditOperations.Cancel ? null : fromSeat,
+            fromStatus, booking.Status));
+
         await database.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        return (await LoadDetail(salonId, booking.Id, cancellationToken))!;
     }
 
     private async Task<StaffBookingDetail?> LoadDetail(Guid salonId, Guid bookingId, CancellationToken cancellationToken)
@@ -122,7 +144,9 @@ public sealed class BookingModificationService(SalonDbContext database, IAvailab
             DateOnly.FromDateTime(startLocal.DateTime),
             row.salon.TimeZoneId,
             customerName,
-            !row.booking.IsActive);
+            !row.booking.IsActive,
+            row.booking.Status,
+            BookingStatusTransitions.Next(row.booking.Status));
     }
 
     private async Task<Guid> RequireStaffSalon(Guid userId, CancellationToken cancellationToken)

@@ -39,7 +39,7 @@ public sealed class EmployeeScheduleService(SalonDbContext database) : IEmployee
             join service in database.Services.AsNoTracking() on booking.ServiceId equals service.Id
             join seat in database.Seats.AsNoTracking() on booking.SeatId equals seat.Id
             where booking.EmployeeId == employeeId && booking.CancelledAtUtc == null && booking.StartsAtUtc < rangeEndUtc && booking.EndsAtUtc > rangeStartUtc
-            select new EmployeeScheduleCalendar.BookingSlice(booking.Id, booking.StartsAtUtc, booking.EndsAtUtc, service.Name, seat.Name)
+            select new EmployeeScheduleCalendar.BookingSlice(booking.Id, booking.StartsAtUtc, booking.EndsAtUtc, service.Name, seat.Name, booking.Status)
         ).ToListAsync(cancellationToken);
 
         var leaves = await database.EmployeeLeaves.AsNoTracking()
@@ -53,7 +53,7 @@ public sealed class EmployeeScheduleService(SalonDbContext database) : IEmployee
             .ToListAsync(cancellationToken);
 
         var items = EmployeeScheduleCalendar.Assemble(salon.TimeZoneId, from, to, bookings, leaves, breaks)
-            .Select(x => new ScheduleItem(x.Kind, x.Date, x.StartsAtLocal, x.EndsAtLocal, x.Label, x.SourceId, x.SeatName))
+            .Select(x => new ScheduleItem(x.Kind, x.Date, x.StartsAtLocal, x.EndsAtLocal, x.Label, x.SourceId, x.SeatName, x.Status))
             .ToArray();
 
         return new EmployeeScheduleResult(employee.Id, employee.Name, salon.TimeZoneId, view, date, from, to, items);

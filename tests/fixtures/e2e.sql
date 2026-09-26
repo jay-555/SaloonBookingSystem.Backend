@@ -23,7 +23,7 @@ VALUES ('44444444-4444-4444-8444-444444444444', '22222222-2222-4222-8222-2222222
 -- Phase 9 calendar fixtures (Monday 2026-09-28 IST): booking 10:00, break 12:00, leave covering Wed.
 INSERT INTO "EmployeeBreaks" ("Id", "EmployeeId", "Day", "StartsAt", "EndsAt")
 VALUES ('55555555-5555-4555-8555-555555555555', '33333333-3333-4333-8333-333333333333', 1, 12 * 60, 13 * 60);
-INSERT INTO "Bookings" ("Id", "SalonId", "ServiceId", "EmployeeId", "SeatId", "StartsAtUtc", "EndsAtUtc")
+INSERT INTO "Bookings" ("Id", "SalonId", "ServiceId", "EmployeeId", "SeatId", "StartsAtUtc", "EndsAtUtc", "Status")
 VALUES (
   '66666666-6666-4666-8666-666666666666',
   '11111111-1111-4111-8111-111111111111',
@@ -31,7 +31,8 @@ VALUES (
   '33333333-3333-4333-8333-333333333333',
   '44444444-4444-4444-8444-444444444444',
   '2026-09-28T04:30:00Z',
-  '2026-09-28T05:30:00Z'
+  '2026-09-28T05:30:00Z',
+  'Confirmed'
 );
 INSERT INTO "EmployeeLeaves" ("Id", "EmployeeId", "StartsAtUtc", "EndsAtUtc")
 VALUES (

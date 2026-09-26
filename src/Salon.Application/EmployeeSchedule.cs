@@ -7,7 +7,8 @@ public sealed record ScheduleItem(
     string EndsAtLocal,
     string Label,
     Guid? SourceId,
-    string? SeatName);
+    string? SeatName,
+    string? Status = null);
 
 public sealed record EmployeeScheduleResult(
     Guid EmployeeId,

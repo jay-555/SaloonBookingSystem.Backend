@@ -266,6 +266,14 @@ public static class AuthenticationSetup
             catch (KeyNotFoundException) { return Results.NotFound(); }
             catch (InvalidOperationException error) { return Results.Conflict(new { error = error.Message }); }
         }).RequireAuthorization();
+        app.MapPost("/bookings/{id:guid}/status", async (Guid id, TransitionBookingInput input, HttpContext context, IBookingModification bookings, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await bookings.Transition(UserId(context), id, input, ct)); }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+            catch (InvalidOperationException error) { return Results.Conflict(new { error = error.Message }); }
+            catch (ArgumentException error) { return PublicBookingValidation(error); }
+        }).RequireAuthorization();
         app.MapGet("/employees/{id:guid}/schedule", async (Guid id, DateOnly date, string view, HttpContext context, IEmployeeSchedule schedules, CancellationToken ct) =>
         {
             try

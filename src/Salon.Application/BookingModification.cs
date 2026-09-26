@@ -1,6 +1,7 @@
 namespace Salon.Application;
 
 public sealed record RescheduleBookingInput(DateOnly Date, string StartsAtLocal, Guid? EmployeeId);
+public sealed record TransitionBookingInput(string Status);
 
 public sealed record StaffBookingDetail(
     Guid BookingId,
@@ -15,11 +16,14 @@ public sealed record StaffBookingDetail(
     DateOnly Date,
     string TimeZoneId,
     string? CustomerName,
-    bool Cancelled);
+    bool Cancelled,
+    string Status,
+    IReadOnlyList<string> AllowedNextStatuses);
 
 public interface IBookingModification
 {
     Task<StaffBookingDetail> Get(Guid userId, Guid bookingId, CancellationToken cancellationToken);
     Task<StaffBookingDetail> Reschedule(Guid userId, Guid bookingId, RescheduleBookingInput input, CancellationToken cancellationToken);
     Task Cancel(Guid userId, Guid bookingId, CancellationToken cancellationToken);
+    Task<StaffBookingDetail> Transition(Guid userId, Guid bookingId, TransitionBookingInput input, CancellationToken cancellationToken);
 }

@@ -41,11 +41,12 @@ public sealed class SeatScheduleService(SalonDbContext database) : ISeatSchedule
                 booking.StartsAtUtc,
                 booking.EndsAtUtc,
                 service.Name + " · " + employee.Name,
-                employee.Name)
+                employee.Name,
+                booking.Status)
         ).ToListAsync(cancellationToken);
 
         var items = EmployeeScheduleCalendar.Assemble(salon.TimeZoneId, from, to, bookings, [], [])
-            .Select(x => new ScheduleItem(x.Kind, x.Date, x.StartsAtLocal, x.EndsAtLocal, x.Label, x.SourceId, x.SeatName))
+            .Select(x => new ScheduleItem(x.Kind, x.Date, x.StartsAtLocal, x.EndsAtLocal, x.Label, x.SourceId, x.SeatName, x.Status))
             .ToArray();
 
         return new SeatScheduleResult(seat.Id, seat.Name, seat.Type, salon.TimeZoneId, view, date, from, to, items);
