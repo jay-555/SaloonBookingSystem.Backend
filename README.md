@@ -346,6 +346,23 @@ advance status within their salon:
 Employee and seat schedule items expose `status` on booking rows. Employee
 Identity role receives 403 for status changes.
 
+## Phase 14: customer CRM profile
+
+Additive migration `CustomerCrmProfile` adds `(SalonId, Phone)` index on
+`Customers`. OwnerAdmin and Manager may search and open read-only profiles
+for their salon. Visit count and spend exclude `Cancelled` bookings and use
+current catalog `Service.Price` (no historical price snapshot). History lists
+all statuses including cancellations. Queries shorter than 2 characters return
+an empty list.
+
+| API | Behavior |
+|---|---|
+| GET `/customers?q=` | Salon-scoped name/phone search (cap 50); OwnerAdmin/Manager |
+| GET `/customers/{id}` | Profile: contact, visits, spend, last/upcoming, service summary, history |
+
+`GET /bookings/{id}` includes optional `customerId` for staff UI links.
+Employee Identity role receives 403. Cross-salon ids return 404.
+
 Browser sessions use Identity cookies with an eight-hour absolute lifetime and
 no remember-me or sliding renewal. Cookies are HttpOnly, host-only, SameSite=Lax,
 and Secure outside Development. Development over HTTP is for loopback local use

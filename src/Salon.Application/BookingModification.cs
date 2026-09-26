@@ -16,6 +16,7 @@ public sealed record StaffBookingDetail(
     DateOnly Date,
     string TimeZoneId,
     string? CustomerName,
+    Guid? CustomerId,
     bool Cancelled,
     string Status,
     IReadOnlyList<string> AllowedNextStatuses);

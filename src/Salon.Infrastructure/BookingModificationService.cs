@@ -144,6 +144,7 @@ public sealed class BookingModificationService(SalonDbContext database, IAvailab
             DateOnly.FromDateTime(startLocal.DateTime),
             row.salon.TimeZoneId,
             customerName,
+            row.booking.CustomerId,
             !row.booking.IsActive,
             row.booking.Status,
             BookingStatusTransitions.Next(row.booking.Status));
