@@ -54,6 +54,7 @@ public static class AuthenticationSetup
         builder.Services.AddScoped<IAvailabilityService, AvailabilityService>();
         builder.Services.AddScoped<IPublicBooking, PublicBookingService>();
         builder.Services.AddScoped<IWalkInBooking, WalkInBookingService>();
+        builder.Services.AddScoped<IBookingModification, BookingModificationService>();
         builder.Services.AddScoped<IEmployeeSchedule, EmployeeScheduleService>();
         builder.Services.AddScoped<ISeatSchedule, SeatScheduleService>();
         builder.Services.AddScoped<AccountProvisioner>();
@@ -165,11 +166,11 @@ public static class AuthenticationSetup
             catch (UnauthorizedAccessException) { return Results.Forbid(); }
             catch (KeyNotFoundException) { return Results.NotFound(); }
         }).RequireAuthorization();
-        app.MapGet("/availability", async (Guid serviceId, DateOnly date, Guid? employeeId, HttpContext context, IAvailabilityService availability, CancellationToken ct) =>
+        app.MapGet("/availability", async (Guid serviceId, DateOnly date, Guid? employeeId, Guid? excludeBookingId, HttpContext context, IAvailabilityService availability, CancellationToken ct) =>
         {
             try
             {
-                return Results.Ok(await availability.Query(UserId(context), new AvailabilityQuery(serviceId, date, employeeId), ct));
+                return Results.Ok(await availability.Query(UserId(context), new AvailabilityQuery(serviceId, date, employeeId, excludeBookingId), ct));
             }
             catch (UnauthorizedAccessException) { return Results.Forbid(); }
             catch (KeyNotFoundException) { return Results.NotFound(); }
@@ -238,6 +239,32 @@ public static class AuthenticationSetup
             catch (SlotUnavailableException error) { return Results.Conflict(new { error = error.Message }); }
             catch (KeyNotFoundException) { return Results.NotFound(); }
             catch (ArgumentException error) { return PublicBookingValidation(error); }
+        }).RequireAuthorization();
+        app.MapGet("/bookings/{id:guid}", async (Guid id, HttpContext context, IBookingModification bookings, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await bookings.Get(UserId(context), id, ct)); }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+        }).RequireAuthorization();
+        app.MapPut("/bookings/{id:guid}", async (Guid id, RescheduleBookingInput input, HttpContext context, IBookingModification bookings, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await bookings.Reschedule(UserId(context), id, input, ct)); }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+            catch (SlotUnavailableException error) { return Results.Conflict(new { error = error.Message }); }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+            catch (InvalidOperationException error) { return Results.Conflict(new { error = error.Message }); }
+            catch (ArgumentException error) { return PublicBookingValidation(error); }
+        }).RequireAuthorization();
+        app.MapPost("/bookings/{id:guid}/cancel", async (Guid id, HttpContext context, IBookingModification bookings, CancellationToken ct) =>
+        {
+            try
+            {
+                await bookings.Cancel(UserId(context), id, ct);
+                return Results.NoContent();
+            }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+            catch (InvalidOperationException error) { return Results.Conflict(new { error = error.Message }); }
         }).RequireAuthorization();
         app.MapGet("/employees/{id:guid}/schedule", async (Guid id, DateOnly date, string view, HttpContext context, IEmployeeSchedule schedules, CancellationToken ct) =>
         {

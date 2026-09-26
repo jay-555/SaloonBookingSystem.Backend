@@ -57,9 +57,11 @@ public sealed class AvailabilityService(SalonDbContext database) : IAvailability
         var leave = await database.EmployeeLeaves.AsNoTracking()
             .Where(x => skilledEmployeeIds.Contains(x.EmployeeId) && x.StartsAtUtc < dayEndUtc && x.EndsAtUtc > dayStartUtc)
             .ToListAsync(cancellationToken);
-        var employeeBookings = await database.Bookings.AsNoTracking()
-            .Where(x => skilledEmployeeIds.Contains(x.EmployeeId) && x.StartsAtUtc < dayEndUtc && x.EndsAtUtc > dayStartUtc)
-            .ToListAsync(cancellationToken);
+        var employeeBookingsQuery = database.Bookings.AsNoTracking()
+            .Where(x => x.CancelledAtUtc == null && skilledEmployeeIds.Contains(x.EmployeeId) && x.StartsAtUtc < dayEndUtc && x.EndsAtUtc > dayStartUtc);
+        if (query.ExcludeBookingId is Guid exclude)
+            employeeBookingsQuery = employeeBookingsQuery.Where(x => x.Id != exclude);
+        var employeeBookings = await employeeBookingsQuery.ToListAsync(cancellationToken);
 
         var seats = await (
             from seat in database.Seats.AsNoTracking()
@@ -71,9 +73,11 @@ public sealed class AvailabilityService(SalonDbContext database) : IAvailability
             throw new ArgumentException("No seats of the required type support this service.", "serviceId");
 
         var seatIds = seats.Select(x => x.Id).ToArray();
-        var seatBookings = await database.Bookings.AsNoTracking()
-            .Where(x => seatIds.Contains(x.SeatId) && x.StartsAtUtc < dayEndUtc && x.EndsAtUtc > dayStartUtc)
-            .ToListAsync(cancellationToken);
+        var seatBookingsQuery = database.Bookings.AsNoTracking()
+            .Where(x => x.CancelledAtUtc == null && seatIds.Contains(x.SeatId) && x.StartsAtUtc < dayEndUtc && x.EndsAtUtc > dayStartUtc);
+        if (query.ExcludeBookingId is Guid excludeSeat)
+            seatBookingsQuery = seatBookingsQuery.Where(x => x.Id != excludeSeat);
+        var seatBookings = await seatBookingsQuery.ToListAsync(cancellationToken);
 
         var employees = skilledEmployeeIds.Select(id =>
         {

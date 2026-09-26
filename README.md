@@ -304,6 +304,23 @@ Uses staff `/availability` for slot browsing. Employee role receives 403.
 Admin UI: `/admin/walk-in`. A walk-in occupies the same employee/seat window a
 website booking would.
 
+## Phase 12: booking modification
+
+Additive migration `BookingModification` adds `Bookings.CancelledAtUtc`,
+`BookingAudits`, and partial GiST exclusions so cancelled rows do not block
+slots. OwnerAdmin and Manager may reschedule/reassign or cancel within their
+salon using the Phase 7 engine (exclude the booking being moved from busy
+checks):
+
+| API | Behavior |
+|---|---|
+| GET `/bookings/{id}` | Staff booking detail |
+| PUT `/bookings/{id}` | Reschedule/reassign (`date`, `startsAtLocal`, optional `employeeId`); CSRF; 409 if taken |
+| POST `/bookings/{id}/cancel` | Soft-cancel; frees employee/seat window; writes audit |
+
+Staff `/availability` accepts optional `excludeBookingId`. Calendars omit
+cancelled bookings. Admin UI: `/admin/bookings/{id}` (linked from calendars).
+
 Browser sessions use Identity cookies with an eight-hour absolute lifetime and
 no remember-me or sliding renewal. Cookies are HttpOnly, host-only, SameSite=Lax,
 and Secure outside Development. Development over HTTP is for loopback local use
